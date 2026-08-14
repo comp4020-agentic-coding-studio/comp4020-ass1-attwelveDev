@@ -1,25 +1,38 @@
 import { sampleAllocation } from "../lib/sample-ballots";
-import { springTranslateKeyframes } from "../lib/spring";
+import type { BoxState } from "../lib/spring";
+import { springBoxKeyframes } from "../lib/spring";
 import type { Candidate, Scenario } from "../lib/types";
 
 const TOTAL_SAMPLE_CHIPS = 24;
 const DRIFT_DISTANCE_PX = 60;
 const HERO_FADE_DURATION_MS = 400;
+const FLIGHT_DURATION_MS = 600;
+// The coloured stack bar is a stack of ballot papers seen edge-on, so a
+// landed chip flattens down to a thin colour-matched line rather than
+// staying a small white rectangle sitting on top of it.
+const LANDED_STRIP_HEIGHT_PX = 3;
+
+interface EdgeStyle {
+  backgroundColor: string;
+  borderWidth: string;
+  borderRadius: string;
+}
 
 // Animates a small representative sample of mini ballot-paper chips drifting
 // down into each candidate's stack, triggered once the section scrolls into
-// view. When a hero ballot illustration is present, it fades out and flies
-// one extra chip the real cross-column path from the hero's position to its
-// first preference's stack fill — and reverses that handoff (fades back in,
-// flies the chip home) when the hero scrolls back into view, since that's
-// the one animation in this piece the user wants scroll-reversible. The
-// swarm sample stays one-shot: it has no "undo" state to return to. The hero
-// can live in a different chapter from the stacks it flies into (an intro
-// chapter handing off to the next), so heroRoot and targetRoot are scoped
-// independently; pass the same root for both when they share one chapter.
-// Skips straight to the final position for prefers-reduced-motion, and
-// degrades gracefully (immediate placement, no animation, no reversal)
-// wherever IntersectionObserver or Element.animate aren't available at all.
+// view. When a hero ballot illustration is present, it fades out while a
+// clone of the real ballot flies (and visibly shrinks/clips its own content
+// down to a flat line) from the hero's position to its first preference's
+// stack fill — reversing that handoff (grows back, fades back in) when the
+// hero scrolls back into view, since that's the one animation in this piece
+// the user wants scroll-reversible. The swarm sample stays one-shot: it has
+// no "undo" state to return to. The hero can live in a different chapter
+// from the stacks it flies into (an intro chapter handing off to the next),
+// so heroRoot and targetRoot are scoped independently; pass the same root
+// for both when they share one chapter. Skips straight to the final
+// flattened position/shape for prefers-reduced-motion, and degrades
+// gracefully (immediate placement, no animation, no reversal) wherever
+// IntersectionObserver or Element.animate aren't available at all.
 export function initBallotDrift(
   heroRoot: ParentNode | null,
   targetRoot: ParentNode,
@@ -56,20 +69,49 @@ export function initBallotDrift(
     return chip;
   }
 
+  function applyEdgeStyle(el: HTMLElement, style: EdgeStyle): void {
+    el.style.backgroundColor = style.backgroundColor;
+    el.style.borderWidth = style.borderWidth;
+    el.style.borderRadius = style.borderRadius;
+  }
+
   function flyTo(
     el: HTMLElement,
-    from: { x: number; y: number },
-    to: { x: number; y: number },
+    from: BoxState,
+    to: BoxState,
+    fromStyle: EdgeStyle,
+    toStyle: EdgeStyle,
   ): Promise<void> {
     if (reducedMotion || typeof el.animate !== "function") {
       el.style.transform = `translate(${to.x}px, ${to.y}px)`;
+      el.style.width = `${to.width}px`;
+      el.style.height = `${to.height}px`;
+      applyEdgeStyle(el, toStyle);
       return Promise.resolve();
     }
-    const animation = el.animate(
-      springTranslateKeyframes(from, to, { stiffness: 170, damping: 20 }),
-      { duration: 600, fill: "forwards" },
-    );
+    const frames = springBoxKeyframes(from, to, { stiffness: 170, damping: 20 });
+    frames[0] = { ...frames[0], ...fromStyle };
+    frames[frames.length - 1] = { ...frames[frames.length - 1], ...toStyle };
+    const animation = el.animate(frames, {
+      duration: FLIGHT_DURATION_MS,
+      fill: "forwards",
+    });
     return animation.finished.then(() => {});
+  }
+
+  function fadeOutMark(mark: HTMLElement): void {
+    if (reducedMotion || typeof mark.animate !== "function") {
+      mark.style.opacity = "0";
+      return;
+    }
+    mark.animate(
+      [
+        { opacity: 1, offset: 0 },
+        { opacity: 0, offset: 0.5 },
+        { opacity: 0, offset: 1 },
+      ],
+      { duration: FLIGHT_DURATION_MS, fill: "forwards" },
+    );
   }
 
   function fadeHero(hero: HTMLElement, targetOpacity: 0 | 1): void {
@@ -96,16 +138,39 @@ export function initBallotDrift(
       const count = allocation[candidate.id] ?? 0;
       const targetRect = fillRectFor(candidate.id);
 
-      const to = {
-        x: (targetRect?.left ?? containerRect.left) - containerRect.left,
-        y: (targetRect?.top ?? containerRect.top) - containerRect.top,
+      const toX = (targetRect?.left ?? containerRect.left) - containerRect.left;
+      const toY = (targetRect?.top ?? containerRect.top) - containerRect.top;
+      const to: BoxState = {
+        x: toX,
+        y: toY,
+        width: targetRect?.width ?? containerRect.width,
+        height: LANDED_STRIP_HEIGHT_PX,
       };
-      const from = { x: to.x, y: to.y - DRIFT_DISTANCE_PX };
 
       for (let i = 0; i < count; i++) {
         const chip = createMiniBallot(candidate);
         container!.appendChild(chip);
-        flyTo(chip, from, to);
+        const naturalRect = chip.getBoundingClientRect();
+
+        const from: BoxState = {
+          x: toX,
+          y: toY - DRIFT_DISTANCE_PX,
+          width: naturalRect.width,
+          height: naturalRect.height,
+        };
+
+        const mark = chip.querySelector<HTMLElement>(
+          ".ballot-paper-mini-mark",
+        );
+        if (mark) fadeOutMark(mark);
+
+        void flyTo(
+          chip,
+          from,
+          to,
+          { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.15rem" },
+          { backgroundColor: candidate.colour, borderWidth: "0px", borderRadius: "0px" },
+        );
       }
     }
   }
@@ -135,6 +200,7 @@ export function initBallotDrift(
   if (!hero || !heroCandidate) return;
 
   let heroChip: HTMLElement | null = null;
+  let heroNaturalSize: { width: number; height: number } | null = null;
   let heroAway = false;
 
   function heroOrigin(): { x: number; y: number } {
@@ -160,11 +226,49 @@ export function initBallotDrift(
     heroAway = true;
     fadeHero(hero!, 0);
 
-    const chip = createMiniBallot(heroCandidate!);
-    chip.dataset.heroBallotChip = "";
-    container!.appendChild(chip);
-    heroChip = chip;
-    await flyTo(chip, heroOrigin(), heroDestination());
+    const clone = hero!.cloneNode(true) as HTMLElement;
+    clone.removeAttribute("data-hero-ballot");
+    clone.dataset.heroBallotChip = "";
+    clone.setAttribute("aria-hidden", "true");
+    clone.style.position = "absolute";
+    clone.style.top = "0";
+    clone.style.left = "0";
+    clone.style.margin = "0";
+    clone.style.boxSizing = "border-box";
+    clone.style.overflow = "hidden";
+    clone.style.pointerEvents = "none";
+    container!.appendChild(clone);
+
+    const naturalRect = clone.getBoundingClientRect();
+    heroNaturalSize = { width: naturalRect.width, height: naturalRect.height };
+    heroChip = clone;
+
+    const origin = heroOrigin();
+    const destination = heroDestination();
+    const destRect = fillRectFor(heroCandidate!.id);
+
+    const from: BoxState = {
+      ...origin,
+      width: naturalRect.width,
+      height: naturalRect.height,
+    };
+    const to: BoxState = {
+      ...destination,
+      width: destRect?.width ?? naturalRect.width,
+      height: LANDED_STRIP_HEIGHT_PX,
+    };
+
+    await flyTo(
+      clone,
+      from,
+      to,
+      { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.25rem" },
+      {
+        backgroundColor: heroCandidate!.colour,
+        borderWidth: "0px",
+        borderRadius: "0px",
+      },
+    );
   }
 
   async function flyBackward(): Promise<void> {
@@ -173,9 +277,33 @@ export function initBallotDrift(
     fadeHero(hero!, 1);
 
     const chip = heroChip;
+    const naturalSize = heroNaturalSize;
     heroChip = null;
-    if (!chip) return;
-    await flyTo(chip, heroDestination(), heroOrigin());
+    heroNaturalSize = null;
+    if (!chip || !naturalSize) return;
+
+    const origin = heroOrigin();
+    const destination = heroDestination();
+    const destRect = fillRectFor(heroCandidate!.id);
+
+    const from: BoxState = {
+      ...destination,
+      width: destRect?.width ?? naturalSize.width,
+      height: LANDED_STRIP_HEIGHT_PX,
+    };
+    const to: BoxState = { ...origin, ...naturalSize };
+
+    await flyTo(
+      chip,
+      from,
+      to,
+      {
+        backgroundColor: heroCandidate!.colour,
+        borderWidth: "0px",
+        borderRadius: "0px",
+      },
+      { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.25rem" },
+    );
     chip.remove();
   }
 
