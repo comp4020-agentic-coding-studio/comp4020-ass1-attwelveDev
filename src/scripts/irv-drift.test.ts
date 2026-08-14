@@ -127,14 +127,23 @@ describe("initIrvDrift", () => {
     expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(0);
   });
 
-  it("suppresses chip spawning entirely under reduced motion", () => {
+  it("still spawns transfer chips under reduced motion, snapped instantly instead of animated", () => {
     const { root, animateSpy } = setUp(["a", "b", "c"], true);
     initIrvDrift(root, threeCandidateScenario());
 
     clickNext(root);
 
-    expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(0);
+    const chips = root.querySelectorAll('[data-transfer-chip-for="a"]');
+    expect(chips.length).toBeGreaterThan(0);
     expect(animateSpy).not.toHaveBeenCalled();
+
+    const chip = chips[0] as HTMLElement;
+    expect(chip.style.borderWidth).toBe("0px");
+    expect(chip.style.borderRadius).toBe("0px");
+    expect(chip.style.backgroundColor).toBe(cssColor(root.ownerDocument, "#000"));
+
+    const mark = chip.querySelector<HTMLElement>(".ballot-paper-mini-mark")!;
+    expect(mark.style.opacity).toBe("0");
   });
 
   it("lands transfer chips on the receiving candidate's colour fill, not the whole stack", () => {
