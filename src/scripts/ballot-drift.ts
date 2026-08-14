@@ -564,7 +564,13 @@ export function initBallotDrift(
           else void flyForward();
         }
       },
-      { threshold: 0 },
+      // Without a margin, threshold: 0 fires the instant either edge of the
+      // hero merely peeks into the viewport -- so a quick scroll up then
+      // back down crosses that edge twice in a hurry, retriggering the
+      // flight well before the reader has actually arrived back at this
+      // section. Require the same substantially-in-view band the swarm
+      // uses, so a bare peek at the boundary never counts as a real visit.
+      { threshold: 0, rootMargin: "-35% 0px -35% 0px" },
     );
     heroObserver.observe(hero);
   } else {
