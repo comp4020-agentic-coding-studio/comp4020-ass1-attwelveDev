@@ -10,12 +10,21 @@ const HERO_FADE_DURATION_MS = 400;
 // down into each candidate's stack, triggered once the section scrolls into
 // view. When a hero ballot illustration is present, it fades out in place
 // while one extra chip flies the real cross-column path from the hero's
-// position to its first preference's stack. Skips straight to the final
-// position for prefers-reduced-motion, and degrades gracefully (immediate
-// placement, no animation) wherever IntersectionObserver or Element.animate
-// aren't available at all.
-export function initBallotDrift(root: ParentNode, scenario: Scenario): void {
-  const container = root.querySelector<HTMLElement>("[data-ballot-drift]");
+// position to its first preference's stack. The hero can live in a
+// different chapter from the stacks it flies into (an intro chapter handing
+// off to the next), so heroRoot and targetRoot are scoped independently;
+// pass the same root for both when they share one chapter. Skips straight to
+// the final position for prefers-reduced-motion, and degrades gracefully
+// (immediate placement, no animation) wherever IntersectionObserver or
+// Element.animate aren't available at all.
+export function initBallotDrift(
+  heroRoot: ParentNode | null,
+  targetRoot: ParentNode,
+  scenario: Scenario,
+): void {
+  const container = targetRoot.querySelector<HTMLElement>(
+    "[data-ballot-drift]",
+  );
   if (!container) return;
 
   const doc = container.ownerDocument;
@@ -74,7 +83,7 @@ export function initBallotDrift(root: ParentNode, scenario: Scenario): void {
     const containerRect = container!.getBoundingClientRect();
 
     for (const candidate of scenario.candidates) {
-      const target = root.querySelector<HTMLElement>(
+      const target = targetRoot.querySelector<HTMLElement>(
         `[data-candidate="${candidate.id}"]`,
       );
       const count = allocation[candidate.id] ?? 0;
@@ -93,7 +102,7 @@ export function initBallotDrift(root: ParentNode, scenario: Scenario): void {
       }
     }
 
-    const hero = root.querySelector<HTMLElement>("[data-hero-ballot]");
+    const hero = heroRoot?.querySelector<HTMLElement>("[data-hero-ballot]");
     if (!hero) return;
 
     fadeHero(hero);
@@ -105,7 +114,7 @@ export function initBallotDrift(root: ParentNode, scenario: Scenario): void {
     if (!heroCandidate) return;
 
     const heroRect = hero.getBoundingClientRect();
-    const target = root.querySelector<HTMLElement>(
+    const target = targetRoot.querySelector<HTMLElement>(
       `[data-candidate="${heroCandidate.id}"]`,
     );
     const targetRect = target?.getBoundingClientRect();
