@@ -75,20 +75,26 @@ function clickPrev(root: ParentNode) {
     .click();
 }
 
-function rect(top: number, left: number): DOMRect {
+function rect(top: number, left: number, width = 0, height = 0): DOMRect {
   return {
     top,
     left,
-    right: left,
-    bottom: top,
-    width: 0,
-    height: 0,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
     x: left,
     y: top,
     toJSON() {
       return this;
     },
   };
+}
+
+function cssColor(doc: Document, hex: string): string {
+  const probe = doc.createElement("span");
+  probe.style.backgroundColor = hex;
+  return probe.style.backgroundColor;
 }
 
 describe("initIrvDrift", () => {
@@ -143,9 +149,9 @@ describe("initIrvDrift", () => {
     window.Element.prototype.getBoundingClientRect = function (
       this: Element,
     ) {
-      if (this.hasAttribute("data-fill-for")) return rect(500, 500);
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 192);
       if (this.hasAttribute("data-candidate")) return rect(100, 100);
-      return rect(0, 0);
+      return rect(0, 0, 14, 19);
     };
     const root = window.document.querySelector("section")!;
 
@@ -156,6 +162,37 @@ describe("initIrvDrift", () => {
       '[data-transfer-chip-for="a"]',
     )!;
     expect(chip.style.transform).toBe("translate(500px, 500px)");
+  });
+
+  it("flattens a landed transfer chip into a colour-matched line the width of the fill, no border or white box left behind", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
+    );
+    const { window } = dom;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 192);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0, 14, 19);
+    };
+    const root = window.document.querySelector("section")!;
+
+    initIrvDrift(root, threeCandidateScenario());
+    clickNext(root);
+
+    const chip = root.querySelector<HTMLElement>(
+      '[data-transfer-chip-for="a"]',
+    )!;
+    expect(chip.style.width).toBe("40px");
+    expect(chip.style.height).toBe("3px");
+    expect(chip.style.borderWidth).toBe("0px");
+    expect(chip.style.borderRadius).toBe("0px");
+    expect(chip.style.backgroundColor).toBe(cssColor(window.document, "#000"));
+
+    const mark = chip.querySelector<HTMLElement>(".ballot-paper-mini-mark")!;
+    expect(mark.style.opacity).toBe("0");
   });
 
   it("does nothing when there's no ballot-drift container or next button", () => {
