@@ -185,6 +185,14 @@ a {
   width: 100%;
 }
 
+.candidate-stack button[data-action="remove-candidate"] {
+  margin-left: auto;
+}
+
+.freeplay-controls {
+  margin-top: 1rem;
+}
+
 .ballot-dot {
   position: absolute;
   top: 0;
