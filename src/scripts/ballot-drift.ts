@@ -399,6 +399,20 @@ export function initBallotDrift(
     return { animation, finished: animation.finished.then(() => {}) };
   }
 
+  // Shared cleanup for every code path that can finish a hero flight
+  // (an uninterrupted flyForward/flyBackward, or a retargetActiveFlight
+  // redirect landing). Only reveals the real hero once we're actually back
+  // home (heroAway is false) -- that's what keeps the real hero and its
+  // flying clone from ever both being on screen: the hero stays hidden for
+  // the clone's entire return flight and only reappears once the clone has
+  // landed in its place.
+  function completeHeroFlight(chip: HTMLElement, animation: Animation | null): void {
+    if (heroFlight?.animation !== animation) return;
+    chip.remove();
+    heroFlight = null;
+    if (!heroAway) fadeHero(hero!, 1);
+  }
+
   async function flyForward(): Promise<void> {
     if (heroAway) return;
     heroAway = true;
@@ -435,16 +449,12 @@ export function initBallotDrift(
     heroFlight = { chip, naturalSize, animation, to };
 
     await finished;
-    if (heroFlight?.animation === animation) {
-      chip.remove();
-      heroFlight = null;
-    }
+    completeHeroFlight(chip, animation);
   }
 
   async function flyBackward(): Promise<void> {
     if (!heroAway) return;
     heroAway = false;
-    fadeHero(hero!, 1);
 
     let chip: HTMLElement;
     let naturalSize: { width: number; height: number };
@@ -482,11 +492,16 @@ export function initBallotDrift(
     );
     heroFlight = { chip, naturalSize, animation, to };
 
+    // Under reduced motion there's no clone visibly in flight to begin
+    // with -- runHeroFlight already snapped it straight to its home look
+    // above -- so revealing the real hero right away is safe and matches
+    // the instant, no-transition feel reduced motion promises elsewhere.
+    // completeHeroFlight (below, after the flight settles) will also try
+    // this reveal, but it's a no-op the second time.
+    if (!animation) fadeHero(hero!, 1);
+
     await finished;
-    if (heroFlight?.animation === animation) {
-      chip.remove();
-      heroFlight = null;
-    }
+    completeHeroFlight(chip, animation);
   }
 
   // Sticky-pinned .chapter-viz panels mean the hero's and its landing
@@ -528,12 +543,7 @@ export function initBallotDrift(
     );
     heroFlight = { chip, naturalSize, animation, to };
 
-    void finished.then(() => {
-      if (heroFlight?.animation === animation) {
-        chip.remove();
-        heroFlight = null;
-      }
-    });
+    void finished.then(() => completeHeroFlight(chip, animation));
   }
 
   view.addEventListener("scroll", retargetActiveFlight);
