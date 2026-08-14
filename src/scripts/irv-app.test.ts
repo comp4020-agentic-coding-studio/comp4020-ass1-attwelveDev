@@ -1,5 +1,5 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { initIrvApp } from "./irv-app";
 import type { Scenario } from "../lib/types";
 
@@ -36,11 +36,13 @@ function markup(ids: string[]): string {
   return `<section>${counts}${fills}<p data-testid="winner"></p><p data-testid="round-status"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
 }
 
-function setUp() {
+function setUp(reducedMotion = false) {
   const dom = new JSDOM(
     `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
   );
-  const root = dom.window.document.querySelector("section")!;
+  const { window } = dom;
+  window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion });
+  const root = window.document.querySelector("section")!;
   initIrvApp(root, scenario);
   return root;
 }
@@ -78,6 +80,14 @@ describe("initIrvApp", () => {
     expect(
       root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style.transition,
     ).toContain("height");
+  });
+
+  it("skips the height transition under reduced motion, so round changes snap instantly", () => {
+    const root = setUp(true);
+
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style.transition,
+    ).not.toContain("height");
   });
 
   it("advances on click, showing the elimination and updated counts", () => {
