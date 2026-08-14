@@ -77,6 +77,55 @@ Checks:
   scroll (confirms the bug fix); `prefers-reduced-motion` collapses all of
   it to an instant final state.
 
+## Feature: chips land on the colour, and the hero handoff reverses on scroll-up
+
+Two follow-up problems with the drift animation, found after the ballot-
+mechanics intro chapters shipped: mini-ballot chips were landing at the top
+of each candidate's whole stack column (near the swatch/label), not on the
+coloured fill — the user's mental model is that the colour bar *is* a stack
+of ballot papers, so chips should visibly join the pile, not hover above the
+grey rectangle. Fixed by pointing every landing/origin rect lookup in
+`ballot-drift.ts` and `irv-drift.ts` at `[data-fill-for="id"]` (the element
+whose real rendered height already reflects `--fill-pct`) instead of
+`[data-candidate="id"]` (the whole stack).
+
+Separately, the intro chapters' hero ballot fade+fly only ever played
+forward, once — consistent with the Visual design decision below that
+scroll animation isn't scroll-scrubbed and doesn't reverse. That decision
+still holds for the 24-chip swarm sample (no resting state to return to)
+and for IRV's elimination-transfer chips (already undone by the existing
+Previous/Next buttons). But the user wanted this *specific* handoff to
+un-do: scrolling back up to "How the ballot works" now re-fades the hero in
+and flies its chip back home. This is a scoped exception, not a reversal of
+the whole animation model — implemented as a second, non-disconnecting
+`IntersectionObserver` on the hero element itself (separate from the
+swarm's one-shot, disconnecting observer on the container), with a
+closure-scoped guard against duplicate triggers and `flyTo` now returning
+`Promise<void>` (backed by WAAPI's `animation.finished`) so the reversed
+chip can be removed only once its flight home actually completes.
+
+Bundled in: `.ballot-paper-ranking li { display: flex; }` was suppressing
+`<ol>`'s native `::marker` box, so the numbered IRV ballot showed no numbers
+at all — fixed with a CSS counter (`counter-reset`/`counter-increment`) that
+coexists with the flex row layout, instead of removing that layout.
+
+Checks:
+- `ballot-drift.test.ts` / `irv-drift.test.ts` — landing-target tests mock
+  distinct rects for `data-candidate` vs `data-fill-for` and assert the
+  chip lands on the fill rect.
+- `ballot-drift.test.ts` — a fake `IntersectionObserver` harness drives:
+  forward trigger (hero leaves view → fades out, chip flies forward),
+  backward trigger (hero re-enters → fades back in, chip flies home and is
+  removed once its flight promise resolves), an idempotency case (repeated
+  identical intersection events don't spawn a second hero chip), and a
+  reduced-motion case (both directions snap instantly, no WAAPI calls).
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean.
+- Manual browser pass at both marking viewports (`pnpm preview`): chips
+  visibly land on the colour, not the grey bar; scrolling back up to either
+  intro chapter un-fades the hero and flies its chip back; the IRV ballot
+  shows visible numbers again; `prefers-reduced-motion` still snaps
+  correctly in both directions with no layout breakage.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
@@ -110,7 +159,11 @@ Checks:
 - Animation is scroll-*triggered* per step (IntersectionObserver-style
   checkpoints), not scroll-scrubbed — physics/spring motion doesn't reverse
   naturally, so scrolling back up resets to that step's resting state rather
-  than reverse-playing the drift.
+  than reverse-playing the drift. One deliberate, scoped exception: the
+  intro chapters' hero ballot fade+fly *does* reverse (fades back in, flies
+  its chip home) when scrolling back up to it, since that handoff is the
+  one place a reader is likely to scroll back to re-read "how the ballot
+  works" — the swarm sample and IRV's transfer chips are unaffected.
 - Candidate identity redundantly coded — colour paired with a consistent
   shape/label, not colour alone.
 
