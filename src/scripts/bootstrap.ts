@@ -5,6 +5,7 @@ import { initApp } from "./app";
 import { initBallotDrift } from "./ballot-drift";
 import { initFreeplayApp } from "./freeplay-app";
 import { initIrvApp } from "./irv-app";
+import { initIrvDrift } from "./irv-drift";
 
 const exploreRoot = document.querySelector("#explore-app");
 if (exploreRoot) {
@@ -22,6 +23,7 @@ const recountRoot = document.querySelector("#recount-app");
 if (recountRoot) {
   initIrvApp(recountRoot, scenarioSpoiler);
   initBallotDrift(recountRoot, scenarioSpoiler);
+  initIrvDrift(recountRoot, scenarioSpoiler);
 }
 
 const freeplayRoot = document.querySelector("#freeplay-app");

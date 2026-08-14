@@ -11,6 +11,7 @@ export interface IrvController {
   readonly isFinal: boolean;
   readonly winner: CandidateId | null;
   readonly justEliminated: CandidateId | null;
+  readonly justTransfers: Record<CandidateId, number> | null;
   next(): boolean;
   prev(): boolean;
 }
@@ -37,6 +38,12 @@ export function createIrvController(scenario: Scenario): IrvController {
     // current round lives on the previous round, not this one.
     get justEliminated() {
       return roundIndex > 0 ? rounds[roundIndex - 1].eliminated : null;
+    },
+    get justTransfers() {
+      const previous = roundIndex > 0 ? rounds[roundIndex - 1] : null;
+      return previous?.eliminated
+        ? (previous.transfers[previous.eliminated] ?? null)
+        : null;
     },
     next(): boolean {
       if (roundIndex >= rounds.length - 1) return false;
