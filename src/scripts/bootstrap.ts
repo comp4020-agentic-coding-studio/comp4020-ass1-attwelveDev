@@ -19,7 +19,10 @@ if (spoilerRoot) {
 }
 
 const recountRoot = document.querySelector("#recount-app");
-if (recountRoot) initIrvApp(recountRoot, scenarioSpoiler);
+if (recountRoot) {
+  initIrvApp(recountRoot, scenarioSpoiler);
+  initBallotDrift(recountRoot, scenarioSpoiler);
+}
 
 const freeplayRoot = document.querySelector("#freeplay-app");
 if (freeplayRoot) initFreeplayApp(freeplayRoot, scenarioFreeplay);
