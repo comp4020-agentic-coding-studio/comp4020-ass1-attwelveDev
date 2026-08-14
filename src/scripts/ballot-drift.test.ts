@@ -34,7 +34,11 @@ function setUp(
   reducedMotion: boolean,
   opts: { hero?: boolean; separateHeroSection?: boolean } = {},
 ) {
-  const heroMarkup = opts.hero ? `<div data-hero-ballot="a"></div>` : "";
+  const heroMarkup = opts.hero
+    ? `<div data-hero-ballot="a" class="ballot-paper ballot-paper-full">` +
+      `<p class="ballot-paper-heading">Ballot paper</p>` +
+      `<ol class="ballot-paper-ranking"><li>A</li><li>B</li></ol></div>`
+    : "";
   const stacks =
     `<div data-candidate="a"><div data-fill-for="a"></div></div>` +
     `<div data-candidate="b"><div data-fill-for="b"></div></div>`;
@@ -60,20 +64,29 @@ function setUp(
   };
 }
 
-function rect(top: number, left: number): DOMRect {
+function rect(top: number, left: number, width = 0, height = 0): DOMRect {
   return {
     top,
     left,
-    right: left,
-    bottom: top,
-    width: 0,
-    height: 0,
+    right: left + width,
+    bottom: top + height,
+    width,
+    height,
     x: left,
     y: top,
     toJSON() {
       return this;
     },
   };
+}
+
+// Renders a colour the same way jsdom's CSSOM will serialise it back out of
+// `el.style.backgroundColor`, so assertions don't have to hardcode jsdom's
+// internal rgb() format.
+function cssColor(doc: Document, hex: string): string {
+  const probe = doc.createElement("span");
+  probe.style.backgroundColor = hex;
+  return probe.style.backgroundColor;
 }
 
 // jsdom has no real IntersectionObserver at all, so exercising the hero's
@@ -157,9 +170,9 @@ describe("initBallotDrift", () => {
     window.Element.prototype.getBoundingClientRect = function (
       this: Element,
     ) {
-      if (this.hasAttribute("data-fill-for")) return rect(500, 500);
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 192);
       if (this.hasAttribute("data-candidate")) return rect(100, 100);
-      return rect(0, 0);
+      return rect(0, 0, 14, 19);
     };
 
     initBallotDrift(heroRoot, targetRoot, scenario());
@@ -168,6 +181,103 @@ describe("initBallotDrift", () => {
       '[data-mini-ballot-for="a"]',
     )!;
     expect(chip.style.transform).toBe("translate(500px, 500px)");
+  });
+
+  it("flattens a landed chip into a colour-matched line the width of the fill, no border or white box left behind", () => {
+    const { heroRoot, targetRoot, window } = setUp(true);
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 192);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0, 14, 19);
+    };
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    const chip = targetRoot.querySelector<HTMLElement>(
+      '[data-mini-ballot-for="a"]',
+    )!;
+    expect(chip.style.width).toBe("40px");
+    expect(chip.style.height).toBe("3px");
+    expect(chip.style.borderWidth).toBe("0px");
+    expect(chip.style.borderRadius).toBe("0px");
+    expect(chip.style.backgroundColor).toBe(cssColor(window.document, "#000"));
+
+    const mark = chip.querySelector<HTMLElement>(".ballot-paper-mini-mark")!;
+    expect(mark.style.opacity).toBe("0");
+  });
+
+  it("hero forward-flight chip is a clone of the real ballot, not a mini-ballot chip", () => {
+    const { heroRoot, targetRoot } = setUp(true, { hero: true });
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    const chip = targetRoot.querySelector<HTMLElement>(
+      "[data-hero-ballot-chip]",
+    )!;
+    expect(chip.classList.contains("ballot-paper-full")).toBe(true);
+    expect(chip.querySelector("ol.ballot-paper-ranking")).not.toBeNull();
+    expect(chip.hasAttribute("data-hero-ballot")).toBe(false);
+  });
+
+  it("hero chip lands flattened into the candidate colour, sized to the fill, under reduced motion", () => {
+    const { heroRoot, targetRoot, window } = setUp(true, { hero: true });
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 192);
+      return rect(0, 0, 150, 120);
+    };
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    const chip = targetRoot.querySelector<HTMLElement>(
+      "[data-hero-ballot-chip]",
+    )!;
+    expect(chip.style.width).toBe("40px");
+    expect(chip.style.height).toBe("3px");
+    expect(chip.style.borderWidth).toBe("0px");
+    expect(chip.style.backgroundColor).toBe(cssColor(window.document, "#000"));
+  });
+
+  it("snaps the hero chip's shape and colour back to its natural size and white once it scrolls back into view", async () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(true, { hero: true });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 192);
+      if (
+        this.hasAttribute("data-hero-ballot") ||
+        this.hasAttribute("data-hero-ballot-chip")
+      ) {
+        return rect(0, 0, 150, 120);
+      }
+      return rect(0, 0);
+    };
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+
+    heroObserver.trigger(hero, false);
+    const chip = targetRoot.querySelector<HTMLElement>(
+      "[data-hero-ballot-chip]",
+    )!;
+    expect(chip.style.width).toBe("40px");
+    expect(chip.style.height).toBe("3px");
+
+    heroObserver.trigger(hero, true);
+    expect(chip.style.width).toBe("150px");
+    expect(chip.style.height).toBe("120px");
+    expect(chip.style.backgroundColor).toBe(cssColor(window.document, "#fff"));
+    expect(chip.style.borderWidth).toBe("1px");
+
+    await vi.waitFor(() => {
+      expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+    });
   });
 
   it("does nothing when there's no ballot-drift container in the target root", () => {
