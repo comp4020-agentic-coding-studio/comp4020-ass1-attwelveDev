@@ -1,5 +1,8 @@
 ---
 import "../styles/global.css";
+import CandidateStack from "../components/CandidateStack.astro";
+import VoteSlider from "../components/VoteSlider.astro";
+import { scenarioExplore } from "../data/scenario-explore";
 ---
 
 <!doctype html>
@@ -7,20 +10,47 @@ import "../styles/global.css";
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>COMP4020 prototype</title>
+    <title>Who Really Won? — FPTP vs. preferential voting</title>
   </head>
   <body>
     <header>
       <nav aria-label="Primary">
-        <a href="./">Home</a>
+        <a href="./">Who Really Won?</a>
       </nav>
     </header>
     <main>
-      <h1>COMP4020 prototype</h1>
-      <p data-testid="intro">
-        Replace this with your prototype. This week's brief is on the course website;
-        <code>spec/README.md</code> explains how the checks in this repo relate to it.
-      </p>
+      <h1>Who Really Won?</h1>
+      <section aria-labelledby="explore-heading">
+        <h2 id="explore-heading">How first-past-the-post works</h2>
+        <p>
+          Every voter ranks the candidates in order, but under
+          first-past-the-post only a voter's first preference is ever
+          counted. Try it yourself — move the sliders and watch who's ahead.
+        </p>
+        <div class="stacks">
+          {
+            scenarioExplore.candidates.map((candidate) => (
+              <CandidateStack
+                id={candidate.id}
+                label={candidate.label}
+                colour={candidate.colour}
+                shape={candidate.shape}
+              />
+            ))
+          }
+        </div>
+        <p data-testid="winner"></p>
+        <div class="sliders">
+          {
+            scenarioExplore.candidates.map((candidate) => (
+              <VoteSlider id={candidate.id} label={candidate.label} />
+            ))
+          }
+        </div>
+      </section>
     </main>
+    <script>
+      import "../scripts/bootstrap";
+    </script>
   </body>
 </html>
