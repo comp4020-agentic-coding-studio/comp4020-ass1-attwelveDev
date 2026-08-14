@@ -40,8 +40,10 @@ function setUp(
       `<ol class="ballot-paper-ranking"><li>A</li><li>B</li></ol></div>`
     : "";
   const stacks =
-    `<div data-candidate="a"><div data-fill-for="a"></div></div>` +
-    `<div data-candidate="b"><div data-fill-for="b"></div></div>`;
+    `<div data-candidate="a"><div data-fill-for="a"></div>` +
+    `<input type="range" data-slider-for="a" /></div>` +
+    `<div data-candidate="b"><div data-fill-for="b"></div>` +
+    `<input type="range" data-slider-for="b" /></div>`;
   const markup = opts.separateHeroSection
     ? `<section>${heroMarkup}</section><section>${stacks}<div data-ballot-drift></div></section>`
     : `<section>${heroMarkup}${stacks}<div data-ballot-drift></div></section>`;
@@ -618,5 +620,49 @@ describe("initBallotDrift", () => {
     const callsBefore = animateSpy.mock.calls.length;
     window.dispatchEvent(new window.Event("scroll"));
     expect(animateSpy.mock.calls.length).toBe(callsBefore);
+  });
+
+  // The swarm's landed chips are a fixed-position illustration of the
+  // starting distribution; once the reader actually edits a candidate's
+  // count (dragging its slider), that illustration no longer matches the
+  // live fill and should retire rather than sit there as a stale coloured
+  // line at its original landing height.
+  it("fades and removes the swarm's landed chips once the reader adjusts a slider", async () => {
+    const { heroRoot, targetRoot, window } = setUp(false);
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    expect(
+      targetRoot.querySelectorAll(".ballot-paper-mini").length,
+    ).toBeGreaterThan(0);
+
+    const slider = targetRoot.querySelector('input[data-slider-for="a"]')!;
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+
+    await vi.waitFor(() => {
+      expect(targetRoot.querySelectorAll(".ballot-paper-mini").length).toBe(0);
+    });
+  });
+
+  it("removes the swarm's landed chips immediately, without animating, under reduced motion", () => {
+    const { heroRoot, targetRoot, window } = setUp(true);
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    expect(
+      targetRoot.querySelectorAll(".ballot-paper-mini").length,
+    ).toBeGreaterThan(0);
+
+    const slider = targetRoot.querySelector('input[data-slider-for="a"]')!;
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+
+    expect(targetRoot.querySelectorAll(".ballot-paper-mini").length).toBe(0);
+  });
+
+  it("doesn't touch the swarm chips before any slider has been adjusted", () => {
+    const { heroRoot, targetRoot } = setUp(false);
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    expect(
+      targetRoot.querySelectorAll(".ballot-paper-mini").length,
+    ).toBeGreaterThan(0);
   });
 });
