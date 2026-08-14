@@ -423,6 +423,82 @@ Checks:
   glance at both viewports and the indicator moves immediately when a drag
   changes the lead.
 
+## Feature: hero handoff, premature hero re-trigger, transfer stagger, and a stack layout-shift bug
+
+A further hands-on pass surfaced four more problems, each traced to a
+specific root cause rather than retuned by feel, per the animation-is-a-
+first-class-feature rule above.
+
+- **The original hero ballot stayed visible while its clone flew back,
+  making it obvious there were two.** `flyBackward()` revealed the real hero
+  (`fadeHero(hero, 1)`) immediately, before its clone's return flight had
+  actually landed — so for the whole flight duration both the real hero and
+  its still-in-flight clone were on screen at once. Fixed by moving the
+  reveal into the same `completeHeroFlight()` helper that already handles
+  landing a flight (used by `flyForward`, `flyBackward`, and
+  `retargetActiveFlight`), so the real hero only reappears once its clone is
+  confirmed home — with a redundant-but-harmless synchronous reveal kept in
+  the reduced-motion branch, since there's no visible clone in flight to hide
+  behind in that case.
+- **Scrolling up then back down to "How preferential ballots work"
+  re-triggered its premature animation, though a first scroll-down no longer
+  did.** The earlier swarm fix (`rootMargin: "-35% 0px -35% 0px"`, see
+  above) was only ever applied to the swarm's own `IntersectionObserver` —
+  the hero's *separate* observer (governing this same chapter's fly-
+  forward/fly-backward) still used bare `{ threshold: 0 }`, so any edge-peek
+  counted as a real crossing; a quick scroll up then down crosses that edge
+  twice in a hurry, retriggering the flight well before the reader had
+  actually arrived back. Fixed by giving the hero observer the identical
+  `rootMargin`, so a bare peek at the boundary never counts as a real visit,
+  matching the swarm's existing behaviour.
+- **IRV vote transfers read as a small sliver quickly zooming across, not
+  the eliminated candidate's votes gradually splitting up and flowing
+  over.** Every chip bound for a given receiving candidate departed and
+  landed in lockstep — one un-staggered loop, all launched simultaneously —
+  so a whole batch of chips read as one small clump rather than a stream.
+  Fixed by staggering each chip's departure across the first `350ms` of the
+  `600ms` flight window and correspondingly shortening its own duration, so
+  the whole batch still lands together at the same moment the receiving
+  stack's `--fill-pct` transition finishes growing (preserving the earlier
+  transfer/height sync fix above); also nudged `TOTAL_TRANSFER_CHIPS` from
+  18 to 28, still within this doc's documented 15–30 representative-sample
+  range, for more visual density.
+- **Two stray static lines appeared at the bottom of the last two stacks
+  after clicking "Next round."** Root cause: `.candidate-stack-count` had no
+  reserved width, so swapping its text from a number to the much wider
+  string `"eliminated"` (`irv-app.ts`'s `render()`) changed that one stack's
+  own intrinsic width — and since `.candidate-stack` is a flex column sized
+  to its widest child inside a wrapping flex row, that shoved every stack
+  after it rightward. The swarm's/IRV's landed chips, pixel-positioned once
+  at landing time and never repositioned, stayed exactly where they'd
+  landed before the shift — stranded, looking like stray lines poking out
+  from the stack's new position. Fixed with `min-width: 6rem` (plus
+  `text-align: center`) on `.candidate-stack-count`, reserving enough room
+  for "eliminated" so the swap never changes the stack's width.
+
+Checks:
+- `ballot-drift.test.ts` — a test triggers a hero fly-backward via a fake
+  `IntersectionObserver`, asserts the hero's fade-in doesn't fire until the
+  clone's flight resolves, and that the clone is gone once it does; a second
+  test asserts the hero observer is constructed with the same
+  `rootMargin: "-35% 0px -35% 0px"` the swarm already uses.
+- `irv-drift.test.ts` — a test asserts a receiving candidate's multiple
+  chip flights get distinct, increasing `delay` values rather than one
+  shared delay, and that every chip's `delay + duration` still lands within
+  the original `600ms` window.
+- The stack layout-shift fix has no unit-test equivalent — `jsdom` has no
+  real layout engine, so it can't compute an element's actual rendered
+  width. Per this file's own stated exception for this bug class, the check
+  is a manual browser pass instead (below).
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean.
+- Manual browser pass at both marking viewports (`pnpm preview`): scrolling
+  the hero ballot out and back never shows two ballots at once; scrolling up
+  then quickly back down to "How preferential ballots work" doesn't
+  retrigger its animation; stepping through an IRV round shows a receiving
+  candidate's chips arriving as a visible, gradual stream rather than one
+  simultaneous clump; clicking "Next round" repeatedly never leaves stray
+  static lines poking out below any stack.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
