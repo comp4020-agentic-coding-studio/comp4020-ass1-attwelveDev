@@ -3,7 +3,7 @@ import type { BoxState } from "../lib/spring";
 import { springBoxKeyframes } from "../lib/spring";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
 
-const TOTAL_TRANSFER_CHIPS = 12;
+const TOTAL_TRANSFER_CHIPS = 18;
 const FLIGHT_DURATION_MS = 600;
 // Mirrors ballot-drift.ts's landed shape: the coloured stack bar is a stack
 // of ballot papers seen edge-on, so a landed chip flattens into a thin
@@ -50,6 +50,21 @@ function allocateTransferChips(
     if (remainder <= 0) break;
     allocation[id]++;
     remainder--;
+  }
+
+  // A real, nonzero transfer can still round down to 0 chips for a
+  // small-share receiver — that reads as "this stack grew for no visible
+  // reason." Borrow one chip from whichever id currently holds the most
+  // (as long as it can spare one), so every receiver gets at least a single
+  // visible arrival.
+  for (const id of ids) {
+    if (transfers[id] <= 0 || allocation[id] > 0) continue;
+    const donor = ids
+      .filter((other) => allocation[other] > 1)
+      .sort((a, b) => allocation[b] - allocation[a])[0];
+    if (!donor) continue;
+    allocation[donor]--;
+    allocation[id]++;
   }
 
   return allocation;
@@ -137,14 +152,10 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   }
 
   function spawnTransferChips(
-    eliminatedId: CandidateId,
     transfers: Record<CandidateId, number>,
+    fromRect: DOMRect | undefined,
   ): void {
     const containerRect = container!.getBoundingClientRect();
-    const fromTarget = root.querySelector<HTMLElement>(
-      `[data-fill-for="${eliminatedId}"]`,
-    );
-    const fromRect = fromTarget?.getBoundingClientRect();
     const from = {
       x: (fromRect?.left ?? containerRect.left) - containerRect.left,
       y: (fromRect?.top ?? containerRect.top) - containerRect.top,
@@ -196,6 +207,32 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     }
   }
 
+  // irv-app.ts wires its own click listener on this same button, and (if
+  // registered first) its render() zeroes the eliminated candidate's
+  // --fill-pct — collapsing .candidate-stack-fill's absolutely-positioned
+  // box to a zero-height sliver — before a bubble-phase listener here would
+  // otherwise get to read it. A capturing listener runs before every
+  // bubble-phase listener on this element regardless of registration order,
+  // so snapshot every candidate's pre-click fill geometry here, and hand the
+  // eliminated one's snapshot (not a live re-query) to spawnTransferChips.
+  let preClickFillRects = new Map<CandidateId, DOMRect>();
+  nextButton.addEventListener(
+    "click",
+    () => {
+      preClickFillRects = new Map(
+        Array.from(
+          root.querySelectorAll<HTMLElement>("[data-fill-for]"),
+          (el) =>
+            [el.getAttribute("data-fill-for")!, el.getBoundingClientRect()] as [
+              CandidateId,
+              DOMRect,
+            ],
+        ),
+      );
+    },
+    { capture: true },
+  );
+
   nextButton.addEventListener("click", () => {
     if (!controller.next()) return;
 
@@ -203,6 +240,6 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     const transfers = controller.justTransfers;
     if (!eliminated || !transfers) return;
 
-    spawnTransferChips(eliminated, transfers);
+    spawnTransferChips(transfers, preClickFillRects.get(eliminated));
   });
 }
