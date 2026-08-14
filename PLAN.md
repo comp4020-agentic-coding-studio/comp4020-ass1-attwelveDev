@@ -357,6 +357,72 @@ Checks:
   from the top of the eliminated stack and landing on every receiving stack
   that gained votes, however small the share.
 
+## Feature: drag-on-stack sliders, a per-stack leader indicator, and a stale-swarm fix
+
+A hands-on pass over explore/spoiler/free play surfaced three related
+problems with how votes get adjusted, all scoped to the sections with
+sliders (`app.ts` / `freeplay-app.ts`) — the IRV recount section has no
+sliders and stayed out of scope.
+
+- **A frozen, candidate-coloured line stayed at a stack's original height.**
+  Root cause: the swarm's landed `.ballot-paper-mini` chips
+  (`ballot-drift.ts`) are positioned once via `getBoundingClientRect()` when
+  they land, then never touched again, while `.candidate-stack-fill`'s live
+  top edge moves with `--fill-pct` on every count change — so the chips
+  stayed frozen exactly where they first landed. Fixed with `clearSwarm()`:
+  the first native `"input"` event bubbling from any slider on `targetRoot`
+  now fades (or, under reduced motion, instantly removes) every landed chip
+  — the swarm has done its job of showing where the initial ballots landed,
+  and the live fill takes over from there.
+- **Drag the stack itself, instead of a separate slider control.** Moved the
+  existing native `<input type="range">` to sit directly on top of
+  `.candidate-stack-bar` (`position: absolute; inset: 0`, fully transparent,
+  `touch-action: none`), oriented vertically with the same
+  `writing-mode: vertical-lr; direction: rtl` already used for the old
+  separate widget. The stack is now the control — clicking or dragging
+  anywhere on a candidate's coloured fill changes its count — with zero loss
+  of the existing accessibility contract, since it's still the same native
+  input underneath (keyboard operable, visible `:focus-visible` ring,
+  `aria-valuetext` announcements); only its position/visibility changed, not
+  its behaviour. `app.ts`, `redistribute.ts`, and `format.ts` needed no
+  changes at all, since they already look sliders up by `data-slider-for`
+  wherever they sit in the DOM. `VoteSlider.astro` (the old separate widget)
+  is now dead and removed.
+- **A much clearer way to see who's ahead than a sentence of text.** Kept
+  the existing `aria-live="polite"` sentence (still the accessible channel),
+  and added an `aria-hidden` visual layer: the leading candidate's stack
+  gets an amber "Leading" badge (`.candidate-stack-leader-badge`, laid out
+  but `visibility: hidden` when not leading, so a stack's height never jumps
+  as the lead changes) and a glowing outline on its bar
+  (`.candidate-stack.is-leading .candidate-stack-bar`), both driven by the
+  same `currentWinner()` tie-break `tallyFptp` already provides — toggled
+  via a `stackEls` lookup in `app.ts`, and directly at render time in
+  `freeplay-app.ts` (which rebuilds its DOM from scratch each render anyway).
+
+Checks:
+- `ballot-drift.test.ts` — a test dispatches an `"input"` event and asserts
+  (via `vi.waitFor`) the landed chips fade and are removed; a companion
+  reduced-motion test asserts they're removed immediately with no animation;
+  a regression test asserts nothing happens to the chips before any input.
+- `freeplay-app.test.ts` — asserts each slider is nested inside its own
+  stack's `.candidate-stack-bar` rather than a separate sibling widget, and
+  carries an `aria-label` now that the visible label span is gone.
+- `app.test.ts` / `freeplay-app.test.ts` — assert exactly the currently-ahead
+  candidate's `[data-candidate]` carries `is-leading`, and that it moves to
+  the new leader the instant a slider flips who's ahead.
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean; also
+  confirms nothing else references the removed `VoteSlider.astro`.
+- Manual browser pass at both marking viewports (`pnpm preview`): the
+  swarm's landed strips fade away the moment any stack is first
+  dragged/adjusted, in explore, spoiler, and free play; dragging directly on
+  a candidate's coloured stack changes its count and rebalances the others,
+  and clicking/tapping elsewhere on the bar jumps to that value; Tab still
+  reaches each stack's slider with a visible focus ring and arrow keys still
+  adjust it; touch-dragging a stack at 390×844 adjusts the value without
+  scrolling the page; the leading candidate is instantly identifiable at a
+  glance at both viewports and the indicator moves immediately when a drag
+  changes the lead.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
@@ -413,7 +479,13 @@ Checks:
   drift/spring animation, not just the flagship one.
 - Sliders are native range inputs with `aria-valuetext` announcing e.g.
   "Candidate A: 340 of 1000 votes" — not a custom multi-handle widget, which
-  would be much harder to make keyboard- and screen-reader-accessible.
+  would be much harder to make keyboard- and screen-reader-accessible. They
+  now sit directly on top of each candidate's stack bar (transparent,
+  `aria-label`led with the candidate's name) rather than as a separate widget
+  beside it, so dragging/clicking the stack itself is what moves the value —
+  but it's still the same native `<input type="range">` underneath, so
+  keyboard operability, the focus ring, and `aria-valuetext` all still apply
+  unchanged.
 - Candidate colour is never the only signal (see Visual design above).
 
 ## Explicitly out of scope
