@@ -16,6 +16,46 @@ interface EdgeStyle {
   backgroundColor: string;
   borderWidth: string;
   borderRadius: string;
+  paddingTop?: string;
+  paddingRight?: string;
+  paddingBottom?: string;
+  paddingLeft?: string;
+}
+
+// Mirrors .ballot-paper-full's CSS padding (src/styles/global.css). The hero
+// flight needs to animate padding down to 0 itself — under the clone's
+// border-box sizing, an untouched padding is a floor the landed height can
+// never cross, leaving clipped ballot text sitting on the candidate colour
+// instead of a flattened line.
+const HERO_HOME_PADDING = {
+  paddingTop: "0.75rem",
+  paddingRight: "1rem",
+  paddingBottom: "0.75rem",
+  paddingLeft: "1rem",
+};
+const HERO_LANDED_PADDING = {
+  paddingTop: "0px",
+  paddingRight: "0px",
+  paddingBottom: "0px",
+  paddingLeft: "0px",
+};
+
+function heroHomeStyle(): EdgeStyle {
+  return {
+    backgroundColor: "#fff",
+    borderWidth: "1px",
+    borderRadius: "0.25rem",
+    ...HERO_HOME_PADDING,
+  };
+}
+
+function heroLandedStyle(colour: string): EdgeStyle {
+  return {
+    backgroundColor: colour,
+    borderWidth: "0px",
+    borderRadius: "0px",
+    ...HERO_LANDED_PADDING,
+  };
 }
 
 // Animates a small representative sample of mini ballot-paper chips drifting
@@ -73,6 +113,16 @@ export function initBallotDrift(
     el.style.backgroundColor = style.backgroundColor;
     el.style.borderWidth = style.borderWidth;
     el.style.borderRadius = style.borderRadius;
+    if (style.paddingTop !== undefined) el.style.paddingTop = style.paddingTop;
+    if (style.paddingRight !== undefined) {
+      el.style.paddingRight = style.paddingRight;
+    }
+    if (style.paddingBottom !== undefined) {
+      el.style.paddingBottom = style.paddingBottom;
+    }
+    if (style.paddingLeft !== undefined) {
+      el.style.paddingLeft = style.paddingLeft;
+    }
   }
 
   function flyTo(
@@ -199,8 +249,13 @@ export function initBallotDrift(
     : undefined;
   if (!hero || !heroCandidate) return;
 
-  let heroChip: HTMLElement | null = null;
-  let heroNaturalSize: { width: number; height: number } | null = null;
+  interface HeroFlight {
+    chip: HTMLElement;
+    naturalSize: { width: number; height: number };
+    animation: Animation | null;
+  }
+
+  let heroFlight: HeroFlight | null = null;
   let heroAway = false;
 
   function heroOrigin(): { x: number; y: number } {
@@ -221,11 +276,33 @@ export function initBallotDrift(
     };
   }
 
-  async function flyForward(): Promise<void> {
-    if (heroAway) return;
-    heroAway = true;
-    fadeHero(hero!, 0);
+  // The clone's actual current rendered box, mid-flight or otherwise —
+  // unlike a cached from/to value, this is true regardless of which
+  // Animation (if any) is currently driving it.
+  function currentHeroBox(chip: HTMLElement): BoxState {
+    const containerRect = container!.getBoundingClientRect();
+    const chipRect = chip.getBoundingClientRect();
+    return {
+      x: chipRect.left - containerRect.left,
+      y: chipRect.top - containerRect.top,
+      width: chipRect.width,
+      height: chipRect.height,
+    };
+  }
 
+  function landedBoxFor(naturalSize: { width: number; height: number }): BoxState {
+    const destRect = fillRectFor(heroCandidate!.id);
+    return {
+      ...heroDestination(),
+      width: destRect?.width ?? naturalSize.width,
+      height: LANDED_STRIP_HEIGHT_PX,
+    };
+  }
+
+  function createHeroClone(): {
+    chip: HTMLElement;
+    naturalSize: { width: number; height: number };
+  } {
     const clone = hero!.cloneNode(true) as HTMLElement;
     clone.removeAttribute("data-hero-ballot");
     clone.dataset.heroBallotChip = "";
@@ -234,41 +311,106 @@ export function initBallotDrift(
     clone.style.top = "0";
     clone.style.left = "0";
     clone.style.margin = "0";
-    clone.style.boxSizing = "border-box";
     clone.style.overflow = "hidden";
     clone.style.pointerEvents = "none";
     container!.appendChild(clone);
 
+    // Measure before switching box-sizing: the real hero renders under the
+    // default content-box, so this natural size must match it exactly, or
+    // the reverse flight grows back to the wrong (short) width.
     const naturalRect = clone.getBoundingClientRect();
-    heroNaturalSize = { width: naturalRect.width, height: naturalRect.height };
-    heroChip = clone;
+    clone.style.boxSizing = "border-box";
 
-    const origin = heroOrigin();
-    const destination = heroDestination();
-    const destRect = fillRectFor(heroCandidate!.id);
-
-    const from: BoxState = {
-      ...origin,
-      width: naturalRect.width,
-      height: naturalRect.height,
+    return {
+      chip: clone,
+      naturalSize: { width: naturalRect.width, height: naturalRect.height },
     };
-    const to: BoxState = {
-      ...destination,
-      width: destRect?.width ?? naturalRect.width,
-      height: LANDED_STRIP_HEIGHT_PX,
-    };
+  }
 
-    await flyTo(
-      clone,
+  // Runs (or redirects) one leg of the hero's flight. `fadeOutAtEnd` folds an
+  // opacity ramp into the same keyframe list/inline-style application as the
+  // shape/colour change, rather than a separate animation: that way a
+  // mid-flight redirect only ever has one Animation to cancel, and
+  // cancelling it always reverts opacity along with everything else.
+  function runHeroFlight(
+    chip: HTMLElement,
+    from: BoxState,
+    to: BoxState,
+    fromStyle: EdgeStyle,
+    toStyle: EdgeStyle,
+    fadeOutAtEnd: boolean,
+  ): { animation: Animation | null; finished: Promise<void> } {
+    if (reducedMotion || typeof chip.animate !== "function") {
+      chip.style.transform = `translate(${to.x}px, ${to.y}px)`;
+      chip.style.width = `${to.width}px`;
+      chip.style.height = `${to.height}px`;
+      applyEdgeStyle(chip, toStyle);
+      chip.style.opacity = fadeOutAtEnd ? "0" : "1";
+      return { animation: null, finished: Promise.resolve() };
+    }
+
+    const frames = springBoxKeyframes(from, to, { stiffness: 170, damping: 20 });
+    frames[0] = { ...frames[0], ...fromStyle, opacity: 1 };
+    frames[frames.length - 1] = {
+      ...frames[frames.length - 1],
+      ...toStyle,
+      opacity: fadeOutAtEnd ? 0 : 1,
+    };
+    if (fadeOutAtEnd) {
+      // Hold fully opaque through most of the flight, then fade quickly at
+      // the very end — a "lands, then vanishes" beat, not a gradual fade
+      // while it's still visibly morphing shape and colour.
+      const holdIndex = Math.max(1, Math.floor((frames.length - 1) * 0.85));
+      frames[holdIndex] = { ...frames[holdIndex], opacity: 1 };
+    }
+
+    const animation = chip.animate(frames, {
+      duration: FLIGHT_DURATION_MS,
+      fill: "forwards",
+    });
+    return { animation, finished: animation.finished.then(() => {}) };
+  }
+
+  async function flyForward(): Promise<void> {
+    if (heroAway) return;
+    heroAway = true;
+    fadeHero(hero!, 0);
+
+    let chip: HTMLElement;
+    let naturalSize: { width: number; height: number };
+    let from: BoxState;
+
+    if (heroFlight) {
+      // A backward flight was interrupted before it finished (or before its
+      // own cleanup ran) — reuse its clone and continue from wherever it
+      // actually currently is, not a stale precomputed value.
+      chip = heroFlight.chip;
+      naturalSize = heroFlight.naturalSize;
+      from = currentHeroBox(chip);
+      heroFlight.animation?.cancel?.();
+    } else {
+      const created = createHeroClone();
+      chip = created.chip;
+      naturalSize = created.naturalSize;
+      from = { ...heroOrigin(), ...naturalSize };
+    }
+
+    const to = landedBoxFor(naturalSize);
+    const { animation, finished } = runHeroFlight(
+      chip,
       from,
       to,
-      { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.25rem" },
-      {
-        backgroundColor: heroCandidate!.colour,
-        borderWidth: "0px",
-        borderRadius: "0px",
-      },
+      heroHomeStyle(),
+      heroLandedStyle(heroCandidate!.colour),
+      true,
     );
+    heroFlight = { chip, naturalSize, animation };
+
+    await finished;
+    if (heroFlight?.animation === animation) {
+      chip.remove();
+      heroFlight = null;
+    }
   }
 
   async function flyBackward(): Promise<void> {
@@ -276,41 +418,61 @@ export function initBallotDrift(
     heroAway = false;
     fadeHero(hero!, 1);
 
-    const chip = heroChip;
-    const naturalSize = heroNaturalSize;
-    heroChip = null;
-    heroNaturalSize = null;
-    if (!chip || !naturalSize) return;
+    let chip: HTMLElement;
+    let naturalSize: { width: number; height: number };
+    let from: BoxState;
 
-    const origin = heroOrigin();
-    const destination = heroDestination();
-    const destRect = fillRectFor(heroCandidate!.id);
+    if (heroFlight) {
+      chip = heroFlight.chip;
+      naturalSize = heroFlight.naturalSize;
+      from = heroFlight.animation
+        ? currentHeroBox(chip)
+        : landedBoxFor(naturalSize);
+      heroFlight.animation?.cancel?.();
+    } else {
+      // The previous forward flight already finished and cleaned itself up
+      // — nothing to reuse, so spawn a fresh clone and snap it straight to
+      // the already-landed look before growing it back.
+      const created = createHeroClone();
+      chip = created.chip;
+      naturalSize = created.naturalSize;
+      from = landedBoxFor(naturalSize);
+      applyEdgeStyle(chip, heroLandedStyle(heroCandidate!.colour));
+      chip.style.transform = `translate(${from.x}px, ${from.y}px)`;
+      chip.style.width = `${from.width}px`;
+      chip.style.height = `${from.height}px`;
+    }
 
-    const from: BoxState = {
-      ...destination,
-      width: destRect?.width ?? naturalSize.width,
-      height: LANDED_STRIP_HEIGHT_PX,
-    };
-    const to: BoxState = { ...origin, ...naturalSize };
-
-    await flyTo(
+    const to: BoxState = { ...heroOrigin(), ...naturalSize };
+    const { animation, finished } = runHeroFlight(
       chip,
       from,
       to,
-      {
-        backgroundColor: heroCandidate!.colour,
-        borderWidth: "0px",
-        borderRadius: "0px",
-      },
-      { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.25rem" },
+      heroLandedStyle(heroCandidate!.colour),
+      heroHomeStyle(),
+      false,
     );
-    chip.remove();
+    heroFlight = { chip, naturalSize, animation };
+
+    await finished;
+    if (heroFlight?.animation === animation) {
+      chip.remove();
+      heroFlight = null;
+    }
   }
 
   if (typeof view.IntersectionObserver === "function") {
+    let hasObservedHero = false;
     const heroObserver = new view.IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
+          if (!hasObservedHero) {
+            // The observer's very first report just reflects whatever the
+            // hero's state happens to be at observe() time (e.g. already
+            // below the fold at page load) — not a real scroll transition.
+            hasObservedHero = true;
+            continue;
+          }
           if (entry.isIntersecting) void flyBackward();
           else void flyForward();
         }
