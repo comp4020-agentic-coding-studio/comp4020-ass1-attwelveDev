@@ -22,12 +22,20 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
     const id = el.getAttribute("data-fill-for");
     if (id) fillEls.set(id, el);
   }
+
+  const view = fillEls.values().next().value?.ownerDocument.defaultView;
+  const reducedMotion =
+    typeof view?.matchMedia === "function" &&
+    view.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   // Scoped to these recount fills specifically (an inline style, not a
   // change to .candidate-stack-fill's own CSS rule): explore/spoiler use the
   // same class for continuously-dragged sliders, where an animated height
   // would feel laggy rather than instant.
-  for (const fillEl of fillEls.values()) {
-    fillEl.style.transition = "height 600ms ease";
+  if (!reducedMotion) {
+    for (const fillEl of fillEls.values()) {
+      fillEl.style.transition = "height 600ms ease";
+    }
   }
 
   const total = scenario.groups.reduce((sum, group) => sum + group.count, 0);
