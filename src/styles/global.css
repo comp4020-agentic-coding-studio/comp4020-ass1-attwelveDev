@@ -26,3 +26,24 @@ a {
   gap: 1rem;
   margin-top: 1rem;
 }
+
+.stacks {
+  position: relative;
+}
+
+.ballot-dot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background-color: var(--dot-colour);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ballot-dot {
+    display: none;
+  }
+}

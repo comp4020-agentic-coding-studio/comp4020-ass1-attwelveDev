@@ -34,7 +34,7 @@ const candidateLabels = new Map(
           counted. Try it yourself — move the sliders and watch who's ahead.
         </p>
         <div id="explore-app">
-          <div class="stacks">
+          <div class="stacks" data-ballot-drift>
             {
               scenarioExplore.candidates.map((candidate) => (
                 <CandidateStack
@@ -68,7 +68,7 @@ const candidateLabels = new Map(
           most voters prefer someone else.
         </p>
         <div id="spoiler-app">
-          <div class="stacks">
+          <div class="stacks" data-ballot-drift>
             {
               scenarioSpoiler.candidates.map((candidate) => (
                 <CandidateStack
