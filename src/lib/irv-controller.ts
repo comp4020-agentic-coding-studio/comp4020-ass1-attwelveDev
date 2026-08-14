@@ -10,6 +10,7 @@ export interface IrvController {
   readonly currentRound: IrvRound;
   readonly isFinal: boolean;
   readonly winner: CandidateId | null;
+  readonly justEliminated: CandidateId | null;
   next(): boolean;
   prev(): boolean;
 }
@@ -30,6 +31,12 @@ export function createIrvController(scenario: Scenario): IrvController {
     },
     get winner() {
       return roundIndex === rounds.length - 1 ? winner : null;
+    },
+    // A round's own `eliminated` field names who is *about to be* eliminated
+    // once its transfers are applied — so the elimination that led to the
+    // current round lives on the previous round, not this one.
+    get justEliminated() {
+      return roundIndex > 0 ? rounds[roundIndex - 1].eliminated : null;
     },
     next(): boolean {
       if (roundIndex >= rounds.length - 1) return false;

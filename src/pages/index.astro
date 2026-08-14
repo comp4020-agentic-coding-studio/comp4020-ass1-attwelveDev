@@ -138,6 +138,37 @@ const candidateLabels = new Map(
           the first one.
         </p>
       </section>
+
+      <section aria-labelledby="recount-heading">
+        <h2 id="recount-heading">Recounting the same election under IRV</h2>
+        <p>
+          Here's that same election again, but counted a different way.
+          Instant-runoff voting uses every voter's full ranking: if no one has
+          a majority of first preferences, the last-place candidate is
+          eliminated and their ballots move to each voter's next choice.
+          Step through the recount and watch who wins this time.
+        </p>
+        <div id="recount-app">
+          <div class="stacks">
+            {
+              scenarioSpoiler.candidates.map((candidate) => (
+                <CandidateStack
+                  id={candidate.id}
+                  label={candidate.label}
+                  colour={candidate.colour}
+                  shape={candidate.shape}
+                />
+              ))
+            }
+          </div>
+          <p data-testid="winner"></p>
+          <p data-testid="round-status"></p>
+          <div class="recount-controls">
+            <button type="button" data-action="prev-round">Previous round</button>
+            <button type="button" data-action="next-round">Next round</button>
+          </div>
+        </div>
+      </section>
     </main>
     <script>
       import "../scripts/bootstrap";
