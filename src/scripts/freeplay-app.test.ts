@@ -85,6 +85,19 @@ describe("initFreeplayApp", () => {
     expect(column!.contains(slider)).toBe(true);
   });
 
+  it("nests each slider inside its own stack's bar, not as a separate sibling widget", () => {
+    const { root } = setUp(3);
+    const bar = root.querySelector('[data-candidate="a"] .candidate-stack-bar')!;
+    const slider = root.querySelector('input[data-slider-for="a"]')!;
+    expect(bar.contains(slider)).toBe(true);
+  });
+
+  it("gives each slider an accessible name now that it has no visible label", () => {
+    const { root } = setUp(3);
+    const slider = root.querySelector('input[data-slider-for="a"]')!;
+    expect(slider.getAttribute("aria-label")).toBe("A");
+  });
+
   it("adds a candidate on click, preserving the vote total", () => {
     const { dom, root } = setUp(3);
     const addButton = root.querySelector<HTMLButtonElement>(
