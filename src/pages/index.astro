@@ -23,6 +23,26 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
     </header>
     <main>
       <h1>Who Really Won?</h1>
+      <section class="chapter" aria-labelledby="fptp-ballot-heading">
+        <div class="chapter-prose">
+          <p>
+            Every voter gets one ballot paper. Under first-past-the-post, you
+            tick just one box — your favourite candidate — and that's the
+            only preference this system ever sees.
+          </p>
+        </div>
+        <div class="chapter-viz chapter-viz-intro" id="fptp-ballot-intro">
+          <h2 id="fptp-ballot-heading">How the ballot works</h2>
+          <BallotPaper
+            candidates={scenarioExplore.candidates}
+            ranking={scenarioExplore.groups[0].ranking}
+            variant="full"
+            mode="fptp"
+            hero
+          />
+        </div>
+      </section>
+
       <section class="chapter" aria-labelledby="explore-heading">
         <div class="chapter-prose">
           <p>
@@ -31,12 +51,6 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
             counted. Try it yourself — move the sliders and watch who's
             ahead.
           </p>
-          <BallotPaper
-            candidates={scenarioExplore.candidates}
-            ranking={scenarioExplore.groups[0].ranking}
-            variant="full"
-            hero
-          />
         </div>
         <div class="chapter-viz" id="explore-app">
           <h2 id="explore-heading">How first-past-the-post works</h2>
@@ -59,7 +73,7 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
         </div>
       </section>
 
-      <section class="chapter" aria-labelledby="spoiler-heading">
+      <section class="chapter" id="spoiler-chapter" aria-labelledby="spoiler-heading">
         <div class="chapter-prose">
           <p>
             Now here's one particular election. Aster and Birch are similar
@@ -73,6 +87,7 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
             candidates={scenarioSpoiler.candidates}
             ranking={scenarioSpoiler.groups[0].ranking}
             variant="full"
+            mode="fptp"
             hero
           />
         </div>
@@ -117,6 +132,7 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
                 candidates={scenarioSpoiler.candidates}
                 ranking={strategicBallot.sincereRanking}
                 variant="full"
+                mode="fptp"
               />
             </div>
             <div>
@@ -125,6 +141,7 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
                 candidates={scenarioSpoiler.candidates}
                 ranking={strategicBallot.tacticalRanking}
                 variant="full"
+                mode="fptp"
               />
             </div>
           </div>
@@ -145,6 +162,26 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
         </p>
       </section>
 
+      <section class="chapter" aria-labelledby="irv-ballot-heading">
+        <div class="chapter-prose">
+          <p>
+            This time your ballot asks for more: number every candidate in
+            the order you actually prefer them — 1 for your favourite, 2 for
+            your next, and so on, all the way down.
+          </p>
+        </div>
+        <div class="chapter-viz chapter-viz-intro" id="irv-ballot-intro">
+          <h2 id="irv-ballot-heading">How preferential ballots work</h2>
+          <BallotPaper
+            candidates={scenarioSpoiler.candidates}
+            ranking={scenarioSpoiler.groups[0].ranking}
+            variant="full"
+            mode="irv"
+            hero
+          />
+        </div>
+      </section>
+
       <section class="chapter" aria-labelledby="recount-heading">
         <div class="chapter-prose">
           <p>
@@ -154,12 +191,6 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
             eliminated and their ballots move to each voter's next choice.
             Step through the recount and watch who wins this time.
           </p>
-          <BallotPaper
-            candidates={scenarioSpoiler.candidates}
-            ranking={scenarioSpoiler.groups[0].ranking}
-            variant="full"
-            hero
-          />
         </div>
         <div class="chapter-viz" id="recount-app">
           <h2 id="recount-heading">Recounting the same election under IRV</h2>

@@ -138,8 +138,10 @@ describe("initBallotDrift", () => {
     const chipsB = targetRoot.querySelectorAll('[data-mini-ballot-for="b"]');
     expect(chipsA.length + chipsB.length).toBe(24);
     expect(animateSpy.mock.calls.length).toBeGreaterThan(0);
-    expect(animateSpy.mock.contexts.some((el) => el.hasAttribute("data-hero-ballot"))).toBe(
-      false,
-    );
+    expect(
+      animateSpy.mock.contexts.some((el) =>
+        (el as HTMLElement).hasAttribute("data-hero-ballot"),
+      ),
+    ).toBe(false);
   });
 });
