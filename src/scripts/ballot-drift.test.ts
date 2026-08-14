@@ -103,9 +103,11 @@ function fakeIntersectionObserver() {
   class FakeObserver {
     private readonly callback: IntersectionObserverCallback;
     observed: Element[] = [];
+    options?: IntersectionObserverInit;
 
-    constructor(callback: IntersectionObserverCallback) {
+    constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
       this.callback = callback;
+      this.options = options;
       instances.push(this);
     }
 
@@ -131,6 +133,7 @@ function observerFor(
   instances: {
     observed: Element[];
     trigger(el: Element, isIntersecting: boolean): void;
+    options?: IntersectionObserverInit;
   }[],
   el: Element,
 ) {
@@ -531,5 +534,89 @@ describe("initBallotDrift", () => {
     await vi.waitFor(() => {
       expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
     });
+  });
+
+  it("requires the swarm's container to be substantially in view, not merely peeking at the edge, before it fires", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false);
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    const container = targetRoot.querySelector<HTMLElement>(
+      "[data-ballot-drift]",
+    )!;
+    const swarmObserver = observerFor(instances, container);
+    expect(swarmObserver.options?.rootMargin).toBe("-35% 0px -35% 0px");
+  });
+
+  it("redirects an in-flight hero flight toward a moved destination on scroll, instead of continuing toward a stale target", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false, { hero: true });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    let destLeft = 500;
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, destLeft, 40, 192);
+      if (
+        this.hasAttribute("data-hero-ballot") ||
+        this.hasAttribute("data-hero-ballot-chip")
+      ) {
+        return rect(0, 0, 150, 120);
+      }
+      return rect(0, 0);
+    };
+
+    const cancels: ReturnType<typeof vi.fn>[] = [];
+    let chipFlightCalls = 0;
+    window.HTMLElement.prototype.animate = vi
+      .fn()
+      .mockImplementation((frames: Array<Record<string, unknown>>) => {
+        const isChipFlight = "backgroundColor" in (frames[0] ?? {});
+        if (!isChipFlight) {
+          return {
+            finished: Promise.resolve(),
+            cancel: vi.fn(),
+            playState: "finished",
+          };
+        }
+        chipFlightCalls++;
+        const cancel = vi.fn();
+        cancels.push(cancel);
+        return {
+          finished: new Promise<void>(() => {}),
+          cancel,
+          playState: "running",
+        };
+      });
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+
+    heroObserver.trigger(hero, true);
+    heroObserver.trigger(hero, false);
+    expect(chipFlightCalls).toBe(1);
+
+    destLeft = 900;
+    window.dispatchEvent(new window.Event("scroll"));
+
+    expect(cancels[0]).toHaveBeenCalled();
+    expect(chipFlightCalls).toBe(2);
+  });
+
+  it("does nothing on scroll when there is no active hero flight", () => {
+    const { heroRoot, targetRoot, animateSpy, window } = setUp(false, {
+      hero: true,
+    });
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    const callsBefore = animateSpy.mock.calls.length;
+    window.dispatchEvent(new window.Event("scroll"));
+    expect(animateSpy.mock.calls.length).toBe(callsBefore);
   });
 });
