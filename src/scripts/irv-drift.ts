@@ -1,8 +1,20 @@
 import { createIrvController } from "../lib/irv-controller";
-import { springTranslateKeyframes } from "../lib/spring";
+import type { BoxState } from "../lib/spring";
+import { springBoxKeyframes } from "../lib/spring";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
 
 const TOTAL_TRANSFER_CHIPS = 12;
+const FLIGHT_DURATION_MS = 600;
+// Mirrors ballot-drift.ts's landed shape: the coloured stack bar is a stack
+// of ballot papers seen edge-on, so a landed chip flattens into a thin
+// colour-matched line rather than staying a small white rectangle.
+const LANDED_STRIP_HEIGHT_PX = 3;
+
+interface EdgeStyle {
+  backgroundColor: string;
+  borderWidth: string;
+  borderRadius: string;
+}
 
 // Largest-remainder allocation of a fixed number of visual chips across an
 // eliminated candidate's transfer counts, proportional to how many ballots
@@ -83,18 +95,44 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     return chip;
   }
 
+  function applyEdgeStyle(el: HTMLElement, style: EdgeStyle): void {
+    el.style.backgroundColor = style.backgroundColor;
+    el.style.borderWidth = style.borderWidth;
+    el.style.borderRadius = style.borderRadius;
+  }
+
   function flyTo(
     el: HTMLElement,
-    from: { x: number; y: number },
-    to: { x: number; y: number },
+    from: BoxState,
+    to: BoxState,
+    fromStyle: EdgeStyle,
+    toStyle: EdgeStyle,
   ): void {
     if (typeof el.animate !== "function") {
       el.style.transform = `translate(${to.x}px, ${to.y}px)`;
+      el.style.width = `${to.width}px`;
+      el.style.height = `${to.height}px`;
+      applyEdgeStyle(el, toStyle);
       return;
     }
-    el.animate(
-      springTranslateKeyframes(from, to, { stiffness: 170, damping: 20 }),
-      { duration: 600, fill: "forwards" },
+    const frames = springBoxKeyframes(from, to, { stiffness: 170, damping: 20 });
+    frames[0] = { ...frames[0], ...fromStyle };
+    frames[frames.length - 1] = { ...frames[frames.length - 1], ...toStyle };
+    el.animate(frames, { duration: FLIGHT_DURATION_MS, fill: "forwards" });
+  }
+
+  function fadeOutMark(mark: HTMLElement): void {
+    if (typeof mark.animate !== "function") {
+      mark.style.opacity = "0";
+      return;
+    }
+    mark.animate(
+      [
+        { opacity: 1, offset: 0 },
+        { opacity: 0, offset: 0.5 },
+        { opacity: 0, offset: 1 },
+      ],
+      { duration: FLIGHT_DURATION_MS, fill: "forwards" },
     );
   }
 
@@ -122,15 +160,38 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
         `[data-fill-for="${id}"]`,
       );
       const targetRect = target?.getBoundingClientRect();
-      const to = {
-        x: (targetRect?.left ?? containerRect.left) - containerRect.left,
-        y: (targetRect?.top ?? containerRect.top) - containerRect.top,
+      const toX = (targetRect?.left ?? containerRect.left) - containerRect.left;
+      const toY = (targetRect?.top ?? containerRect.top) - containerRect.top;
+      const to: BoxState = {
+        x: toX,
+        y: toY,
+        width: targetRect?.width ?? containerRect.width,
+        height: LANDED_STRIP_HEIGHT_PX,
       };
 
       for (let i = 0; i < count; i++) {
         const chip = createMiniBallot(candidate);
         container!.appendChild(chip);
-        flyTo(chip, from, to);
+        const naturalRect = chip.getBoundingClientRect();
+        const fromBox: BoxState = {
+          x: from.x,
+          y: from.y,
+          width: naturalRect.width,
+          height: naturalRect.height,
+        };
+
+        const mark = chip.querySelector<HTMLElement>(
+          ".ballot-paper-mini-mark",
+        );
+        if (mark) fadeOutMark(mark);
+
+        flyTo(
+          chip,
+          fromBox,
+          to,
+          { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.15rem" },
+          { backgroundColor: candidate.colour, borderWidth: "0px", borderRadius: "0px" },
+        );
       }
     }
   }
