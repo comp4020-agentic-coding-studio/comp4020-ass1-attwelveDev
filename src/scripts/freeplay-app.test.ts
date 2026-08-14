@@ -65,6 +65,14 @@ describe("initFreeplayApp", () => {
     );
     expect(root.querySelector('[data-count-for="b"]')!.textContent).toBe("0");
     expect(
+      root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("100%");
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="b"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("0%");
+    expect(
       root.querySelector('[data-testid="winner"]')!.textContent,
     ).toContain("A");
   });

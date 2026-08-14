@@ -16,7 +16,10 @@ function section(candidateIds: string[]): string {
   const counts = candidateIds
     .map((id) => `<span data-count-for="${id}">0</span>`)
     .join("");
-  return `<section>${sliders}${counts}<p data-testid="winner"></p></section>`;
+  const fills = candidateIds
+    .map((id) => `<div data-fill-for="${id}"></div>`)
+    .join("");
+  return `<section>${sliders}${counts}${fills}<p data-testid="winner"></p></section>`;
 }
 
 function scenarioFor(ids: [string, string], counts: [number, number]): Scenario {
@@ -70,5 +73,22 @@ describe("initApp scoping", () => {
     expect(sectionA.querySelector('[data-count-for="a"]')!.textContent).toBe(
       "100",
     );
+  });
+
+  it("sets --fill-pct on each candidate's fill element, proportional to its share of the total", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${section(["a", "b"])}</body></html>`,
+    );
+    const root = dom.window.document.querySelector("section")!;
+    initApp(root, scenarioFor(["a", "b"], [60, 40]));
+
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("60%");
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="b"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("40%");
   });
 });

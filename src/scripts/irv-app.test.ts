@@ -30,7 +30,10 @@ function markup(ids: string[]): string {
   const counts = ids
     .map((id) => `<span data-count-for="${id}">0</span>`)
     .join("");
-  return `<section>${counts}<p data-testid="winner"></p><p data-testid="round-status"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
+  const fills = ids
+    .map((id) => `<div data-fill-for="${id}"></div>`)
+    .join("");
+  return `<section>${counts}${fills}<p data-testid="winner"></p><p data-testid="round-status"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
 }
 
 function setUp() {
@@ -52,6 +55,10 @@ describe("initIrvApp", () => {
     expect(root.querySelector('[data-count-for="c"]')!.textContent).toBe(
       "25",
     );
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("40%");
     expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
       "",
     );
@@ -81,6 +88,14 @@ describe("initIrvApp", () => {
     expect(root.querySelector('[data-count-for="c"]')!.textContent).toBe(
       "eliminated",
     );
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("65%");
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="c"]')!.style
+        .getPropertyValue("--fill-pct"),
+    ).toBe("0%");
     expect(
       root.querySelector('[data-testid="round-status"]')!.textContent,
     ).toContain("C");

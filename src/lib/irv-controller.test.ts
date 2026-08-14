@@ -33,9 +33,10 @@ describe("createIrvController", () => {
     expect(controller.isFinal).toBe(false);
     expect(controller.winner).toBeNull();
     expect(controller.justEliminated).toBeNull();
+    expect(controller.justTransfers).toBeNull();
   });
 
-  it("advances to the next round, revealing the winner and who was just eliminated", () => {
+  it("advances to the next round, revealing the winner, who was just eliminated, and where their ballots went", () => {
     const controller = createIrvController(threeCandidateScenario);
     const advanced = controller.next();
     expect(advanced).toBe(true);
@@ -44,6 +45,7 @@ describe("createIrvController", () => {
     expect(controller.isFinal).toBe(true);
     expect(controller.winner).toBe("a");
     expect(controller.justEliminated).toBe("c");
+    expect(controller.justTransfers).toEqual({ a: 25 });
   });
 
   it("won't advance past the final round", () => {
