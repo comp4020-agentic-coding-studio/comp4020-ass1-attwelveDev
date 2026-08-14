@@ -242,6 +242,37 @@ describe("initIrvDrift", () => {
     ).toBeGreaterThanOrEqual(1);
   });
 
+  it("staggers a receiving candidate's chip departures instead of launching them all at once, so the transfer reads as a gradual stream rather than one simultaneous jump", () => {
+    const { root, animateSpy } = setUp(["a", "b", "c"], false);
+    initIrvDrift(root, threeCandidateScenario());
+
+    clickNext(root);
+
+    // c is eliminated and all of its votes transfer to a alone, so every
+    // sampled chip flies to "a" -- a good-sized single-receiver batch to
+    // check the stagger on.
+    const flightCalls = animateSpy.mock.calls.filter((call) =>
+      "transform" in (call[0] as Array<Record<string, unknown>>)[0],
+    );
+    expect(flightCalls.length).toBeGreaterThan(1);
+
+    const delays = flightCalls.map(
+      (call) => (call[1] as { delay?: number }).delay ?? 0,
+    );
+    const uniqueDelays = new Set(delays);
+    expect(uniqueDelays.size).toBeGreaterThan(1);
+
+    // Every chip must still finish (delay + duration) within the same
+    // window the receiving stack's own height transition uses, so nothing
+    // visibly lands after the bar has already stopped growing.
+    for (const call of flightCalls) {
+      const options = call[1] as { delay?: number; duration: number };
+      expect((options.delay ?? 0) + options.duration).toBeLessThanOrEqual(
+        600,
+      );
+    }
+  });
+
   it("captures the eliminated candidate's fill geometry before any other click listener can collapse it", () => {
     const dom = new JSDOM(
       `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
