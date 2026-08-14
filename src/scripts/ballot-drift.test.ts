@@ -50,7 +50,9 @@ function setUp(
   });
   const { window } = dom;
   window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion });
-  const animateSpy = vi.fn().mockReturnValue({ finished: Promise.resolve() });
+  const animateSpy = vi
+    .fn()
+    .mockReturnValue({ finished: Promise.resolve(), cancel: vi.fn() });
   window.HTMLElement.prototype.animate = animateSpy;
   const sections = window.document.querySelectorAll("section");
   const heroRoot = sections[0];
@@ -220,7 +222,7 @@ describe("initBallotDrift", () => {
     expect(chip.hasAttribute("data-hero-ballot")).toBe(false);
   });
 
-  it("hero chip lands flattened into the candidate colour, sized to the fill, under reduced motion", () => {
+  it("hero chip lands flattened into the candidate colour, sized to the fill, under reduced motion", async () => {
     const { heroRoot, targetRoot, window } = setUp(true, { hero: true });
     window.Element.prototype.getBoundingClientRect = function (
       this: Element,
@@ -238,6 +240,20 @@ describe("initBallotDrift", () => {
     expect(chip.style.height).toBe("3px");
     expect(chip.style.borderWidth).toBe("0px");
     expect(chip.style.backgroundColor).toBe(cssColor(window.document, "#000"));
+    // The real ballot's padding would otherwise floor the landed height well
+    // above a flattened strip, leaving its text visibly clipped on top of
+    // the candidate colour instead of disappearing.
+    expect(chip.style.paddingTop).toBe("0px");
+    expect(chip.style.paddingRight).toBe("0px");
+    expect(chip.style.paddingBottom).toBe("0px");
+    expect(chip.style.paddingLeft).toBe("0px");
+
+    // A landed hero clone is a hand-off illusion, not a permanent stand-in
+    // for the (live) fill it's impersonating — it should disappear once
+    // it's done its job, same as under full motion.
+    await vi.waitFor(() => {
+      expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+    });
   });
 
   it("snaps the hero chip's shape and colour back to its natural size and white once it scrolls back into view", async () => {
@@ -262,18 +278,27 @@ describe("initBallotDrift", () => {
     const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
     const heroObserver = observerFor(instances, hero);
 
+    // The observer's very first report just reflects whatever the hero's
+    // state happens to be at observe() time, not a real scroll transition —
+    // it must be ignored, or every hero would flash on load.
+    heroObserver.trigger(hero, true);
+
     heroObserver.trigger(hero, false);
     const chip = targetRoot.querySelector<HTMLElement>(
       "[data-hero-ballot-chip]",
     )!;
     expect(chip.style.width).toBe("40px");
     expect(chip.style.height).toBe("3px");
+    expect(chip.style.paddingTop).toBe("0px");
+    expect(chip.style.paddingLeft).toBe("0px");
 
     heroObserver.trigger(hero, true);
     expect(chip.style.width).toBe("150px");
     expect(chip.style.height).toBe("120px");
     expect(chip.style.backgroundColor).toBe(cssColor(window.document, "#fff"));
     expect(chip.style.borderWidth).toBe("1px");
+    expect(chip.style.paddingTop).toBe("0.75rem");
+    expect(chip.style.paddingLeft).toBe("1rem");
 
     await vi.waitFor(() => {
       expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
@@ -351,7 +376,9 @@ describe("initBallotDrift", () => {
 
     initBallotDrift(heroRoot, targetRoot, scenario());
     const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
-    observerFor(instances, hero).trigger(hero, false);
+    const heroObserver = observerFor(instances, hero);
+    heroObserver.trigger(hero, true);
+    heroObserver.trigger(hero, false);
 
     expect(calledOn.includes(hero)).toBe(true);
     expect(
@@ -370,6 +397,7 @@ describe("initBallotDrift", () => {
     initBallotDrift(heroRoot, targetRoot, scenario());
     const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
     const heroObserver = observerFor(instances, hero);
+    heroObserver.trigger(hero, true);
     heroObserver.trigger(hero, false);
     heroObserver.trigger(hero, true);
 
@@ -391,12 +419,90 @@ describe("initBallotDrift", () => {
     initBallotDrift(heroRoot, targetRoot, scenario());
     const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
     const heroObserver = observerFor(instances, hero);
+    heroObserver.trigger(hero, true);
     heroObserver.trigger(hero, false);
     heroObserver.trigger(hero, false);
 
     expect(
       targetRoot.querySelectorAll("[data-hero-ballot-chip]").length,
     ).toBe(1);
+  });
+
+  it("ignores the observer's first report of pre-existing state, only reacting to a real transition afterwards", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false, { hero: true });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+
+    // A first callback reporting "not intersecting" (below the fold at
+    // mount) must not be treated as a real scroll-past — only a
+    // subsequent report is a genuine transition.
+    heroObserver.trigger(hero, false);
+    expect(hero.style.opacity).not.toBe("0");
+    expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+
+    heroObserver.trigger(hero, false);
+    expect(
+      targetRoot.querySelector("[data-hero-ballot-chip]"),
+    ).not.toBeNull();
+  });
+
+  it("cancels a still-running flight and reuses the same clone when the direction reverses mid-flight", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false, { hero: true });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    const firstCancel = vi.fn();
+    const secondCancel = vi.fn();
+    let calls = 0;
+    // fadeHero() also calls .animate() on the hero element itself (a plain
+    // opacity fade) alongside the chip's own box-morph flight, on the same
+    // shared prototype mock — distinguish the chip flight by its keyframes
+    // (it always carries a backgroundColor) rather than by raw call order.
+    window.HTMLElement.prototype.animate = vi
+      .fn()
+      .mockImplementation((frames: Array<Record<string, unknown>>) => {
+        const isChipFlight = "backgroundColor" in (frames[0] ?? {});
+        if (!isChipFlight) {
+          return { finished: Promise.resolve(), cancel: vi.fn() };
+        }
+        calls++;
+        if (calls === 1) {
+          return { finished: new Promise<void>(() => {}), cancel: firstCancel };
+        }
+        return { finished: Promise.resolve(), cancel: secondCancel };
+      });
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+
+    heroObserver.trigger(hero, true);
+    heroObserver.trigger(hero, false);
+    heroObserver.trigger(hero, true);
+
+    expect(firstCancel).toHaveBeenCalled();
+    expect(calls).toBe(2);
+    expect(
+      targetRoot.querySelectorAll("[data-hero-ballot-chip]").length,
+    ).toBe(1);
+  });
+
+  it("removes the hero clone from the DOM after an uninterrupted forward flight lands", async () => {
+    const { heroRoot, targetRoot } = setUp(false, { hero: true });
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    expect(
+      targetRoot.querySelector("[data-hero-ballot-chip]"),
+    ).not.toBeNull();
+    await vi.waitFor(() => {
+      expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+    });
   });
 
   it("snaps the hero handoff instantly in both directions under reduced motion", async () => {
@@ -410,6 +516,8 @@ describe("initBallotDrift", () => {
     initBallotDrift(heroRoot, targetRoot, scenario());
     const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
     const heroObserver = observerFor(instances, hero);
+
+    heroObserver.trigger(hero, true);
 
     heroObserver.trigger(hero, false);
     expect(hero.style.opacity).toBe("0");
