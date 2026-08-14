@@ -15,6 +15,29 @@ a {
   color: #0b5fff;
 }
 
+header nav a {
+  display: inline-block;
+  padding-block: 0.75rem;
+}
+
+button {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: 1rem;
+  color: #1a1a1a;
+  background: #f0f0f0;
+  border: 1px solid #b3b3b3;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  color: #595959;
+  background: #e5e5e5;
+  cursor: not-allowed;
+}
+
 .chapter {
   display: flex;
   flex-direction: column;
@@ -28,6 +51,8 @@ a {
   top: 0;
   z-index: 1;
   min-height: 35vh;
+  max-height: 40vh;
+  overflow-y: auto;
   padding-block: 1rem;
   background: #fff;
   border-bottom: 1px solid #e5e5e5;
@@ -68,6 +93,8 @@ a {
     min-width: 0;
     top: 10vh;
     min-height: 0;
+    max-height: none;
+    overflow-y: visible;
   }
 }
 
@@ -202,10 +229,4 @@ a {
   border-radius: 50%;
   background-color: var(--dot-colour);
   pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ballot-dot {
-    display: none;
-  }
 }

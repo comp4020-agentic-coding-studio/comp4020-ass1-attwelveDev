@@ -49,7 +49,7 @@ const candidateLabels = new Map(
               ))
             }
           </div>
-          <p data-testid="winner"></p>
+          <p data-testid="winner" aria-live="polite"></p>
           <div class="sliders">
             {
               scenarioExplore.candidates.map((candidate) => (
@@ -85,7 +85,7 @@ const candidateLabels = new Map(
               ))
             }
           </div>
-          <p data-testid="winner"></p>
+          <p data-testid="winner" aria-live="polite"></p>
           <div class="sliders">
             {
               scenarioSpoiler.candidates.map((candidate) => (
@@ -172,8 +172,8 @@ const candidateLabels = new Map(
               ))
             }
           </div>
-          <p data-testid="winner"></p>
-          <p data-testid="round-status"></p>
+          <p data-testid="winner" aria-live="polite"></p>
+          <p data-testid="round-status" aria-live="polite"></p>
           <div class="recount-controls">
             <button type="button" data-action="prev-round">Previous round</button>
             <button type="button" data-action="next-round">Next round</button>
@@ -190,7 +190,7 @@ const candidateLabels = new Map(
         </p>
         <div id="freeplay-app">
           <div class="stacks" data-freeplay-stacks></div>
-          <p data-testid="winner"></p>
+          <p data-testid="winner" aria-live="polite"></p>
           <div class="sliders" data-freeplay-sliders></div>
           <div class="freeplay-controls">
             <button type="button" data-action="add-candidate">
