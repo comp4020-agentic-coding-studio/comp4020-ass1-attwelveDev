@@ -276,6 +276,87 @@ Checks:
   actual stack bars smoothly draining/filling on every elimination,
   reduced-motion included.
 
+## Feature: three follow-up bugs from a second manual pass
+
+The prior bug-fix pass shipped and passed its own manual verification, but a
+further manual pass surfaced three more problems — each traced to a specific
+root cause (two confirmed via a background `agent-browser` session driving
+the live `pnpm preview` site at both marking viewports; the third found by
+re-reading `irv-drift.ts` against `irv-app.ts`'s click-handler ordering),
+per the animation-is-a-first-class-feature rule above.
+
+- **Fast scroll-up landed the hero clone in empty space.** `heroOrigin()`/
+  `landedBoxFor()` were read once, synchronously, when a flight started, and
+  baked into a fixed-keyframe 600ms WAAPI animation that never re-sampled.
+  Each chapter's `.chapter-viz` panel pins/unpins independently
+  (`position: sticky`), so a fast scroll could move the hero and its landing
+  target's relative on-screen position well before that 600ms window
+  finished — confirmed empirically at 1920×1080: the reverse-flight clone's
+  destination was captured once at scrollY=973, then the page kept
+  scrolling another ~700ms/~820px while the clone's target stayed frozen at
+  that stale snapshot. Fixed by adding `retargetActiveFlight()` — a `scroll`
+  listener that re-samples the true destination on every tick and, if a
+  running flight has drifted from the destination it was actually built
+  for, redirects it (reusing the same cancel-and-continue mechanism the
+  existing mid-flight direction-reversal handling already used).
+- **A spurious animation appeared in `#recount-app` while still reading "How
+  preferential ballots work."** The swarm's `IntersectionObserver` used
+  `{ threshold: 0.3 }` on its own container — satisfied as soon as ~30% of
+  the container's area entered the viewport from any edge, including merely
+  peeking up from the bottom. Confirmed empirically: at 1920×1080 the swarm
+  fired at scrollY≈3850, *before* the IRV-intro chapter had even started
+  entering the viewport; at 390×844 it fired at the exact instant the
+  reader arrived at the intro heading. Fixed by adding
+  `rootMargin: "-35% 0px -35% 0px"` (with `threshold: 0`), shrinking the
+  effective intersection root to the central 30% band of the viewport, so
+  the container must scroll into that band, not merely tag an edge.
+- **IRV vote transfers read as "one goes to zero, the other magically gains
+  votes."** Two compounding causes, both in `irv-drift.ts`: (1) both
+  `irv-app.ts` and `irv-drift.ts` register a `click` listener on the same
+  "Next round" button; `irv-app.ts`'s registers first in `bootstrap.ts`, and
+  its `render()` zeroes the eliminated candidate's `--fill-pct` — since
+  `.candidate-stack-fill` is `position: absolute; bottom: 0; height:
+  var(--fill-pct)`, a 0% height collapses the box's top and bottom to the
+  same point, so the chips' departure point read from a live
+  `getBoundingClientRect()` was already collapsed by the time it was read;
+  (2) `allocateTransferChips`'s largest-remainder split could round a real,
+  nonzero transfer down to 0 chips for a small-share receiver, so that
+  stack's growth had no visible chip arriving at all. Fixed by (1) a
+  capture-phase click listener that snapshots every candidate's fill rect
+  before any bubble-phase listener runs — capture always precedes bubble
+  regardless of registration order, so this is correct independent of
+  `bootstrap.ts`'s call order — and handing the eliminated candidate's
+  snapshotted rect to `spawnTransferChips` instead of a live re-query; and
+  (2) a fix-up pass after the largest-remainder split that borrows one chip
+  from the largest receiver for any candidate with a real transfer and a
+  zero allocation, plus bumping `TOTAL_TRANSFER_CHIPS` from 12 to 18 for
+  headroom to do that borrowing without starving the largest receiver.
+
+Checks:
+- `ballot-drift.test.ts` — a test drives a fake `IntersectionObserver` and a
+  mocked `animate` returning a `"running"` animation, triggers a forward
+  flight, moves the mocked destination rect, dispatches a `scroll` event,
+  and asserts the original animation was cancelled and a second flight
+  started toward the new destination; a companion test asserts a `scroll`
+  event with no active flight calls `animate` no further times; a third
+  test asserts the swarm's `IntersectionObserver` is constructed with
+  `rootMargin: "-35% 0px -35% 0px"`.
+- `irv-drift.test.ts` — a test uses a scenario with a 99/1 transfer split
+  and asserts the 1%-share receiver still gets at least one chip; a second
+  test registers a plain bubble listener that collapses the mocked fill
+  rect for the eliminated candidate *before* `initIrvDrift` is called
+  (mirroring `irv-app.ts` running first in `bootstrap.ts`), then asserts the
+  chip's actual flight still departs from the original, pre-collapse rect.
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean.
+- Manual browser pass at both marking viewports (`pnpm preview`): scrolling
+  up fast past either intro chapter keeps the hero clone visually attached
+  to the real ballot's actual position, never landing on stale empty space;
+  scrolling down slowly to "How preferential ballots work" shows nothing
+  animating in `#recount-app` until the reader has actually reached it;
+  stepping through the IRV recount rounds shows chips visibly departing
+  from the top of the eliminated stack and landing on every receiving stack
+  that gained votes, however small the share.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
