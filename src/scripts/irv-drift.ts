@@ -3,8 +3,18 @@ import type { BoxState } from "../lib/spring";
 import { springBoxKeyframes } from "../lib/spring";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
 
-const TOTAL_TRANSFER_CHIPS = 18;
+// Within PLAN.md's documented "roughly 15-30" representative-sample range —
+// pushed toward the top of it so a receiving candidate's stream of arrivals
+// reads as substantial rather than a token few.
+const TOTAL_TRANSFER_CHIPS = 28;
 const FLIGHT_DURATION_MS = 600;
+// Chips for the same receiver stagger their departure across this window
+// instead of all launching at once, so the transfer reads as a gradual
+// stream rather than a single simultaneous jump. Each chip's own flight
+// duration is shortened by however much its departure was delayed, so the
+// whole batch still finishes at FLIGHT_DURATION_MS — the same moment the
+// receiving stack's own --fill-pct CSS transition finishes growing.
+const STAGGER_WINDOW_MS = 350;
 // Mirrors ballot-drift.ts's landed shape: the coloured stack bar is a stack
 // of ballot papers seen edge-on, so a landed chip flattens into a thin
 // colour-matched line rather than staying a small white rectangle.
@@ -122,6 +132,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     to: BoxState,
     fromStyle: EdgeStyle,
     toStyle: EdgeStyle,
+    delayMs: number,
   ): void {
     if (reducedMotion || typeof el.animate !== "function") {
       el.style.transform = `translate(${to.x}px, ${to.y}px)`;
@@ -133,10 +144,14 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     const frames = springBoxKeyframes(from, to, { stiffness: 170, damping: 20 });
     frames[0] = { ...frames[0], ...fromStyle };
     frames[frames.length - 1] = { ...frames[frames.length - 1], ...toStyle };
-    el.animate(frames, { duration: FLIGHT_DURATION_MS, fill: "forwards" });
+    el.animate(frames, {
+      duration: FLIGHT_DURATION_MS - delayMs,
+      delay: delayMs,
+      fill: "forwards",
+    });
   }
 
-  function fadeOutMark(mark: HTMLElement): void {
+  function fadeOutMark(mark: HTMLElement, delayMs: number): void {
     if (reducedMotion || typeof mark.animate !== "function") {
       mark.style.opacity = "0";
       return;
@@ -147,7 +162,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
         { opacity: 0, offset: 0.5 },
         { opacity: 0, offset: 1 },
       ],
-      { duration: FLIGHT_DURATION_MS, fill: "forwards" },
+      { duration: FLIGHT_DURATION_MS - delayMs, delay: delayMs, fill: "forwards" },
     );
   }
 
@@ -191,10 +206,13 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
           height: naturalRect.height,
         };
 
+        const delayMs =
+          count > 1 ? Math.round((i / count) * STAGGER_WINDOW_MS) : 0;
+
         const mark = chip.querySelector<HTMLElement>(
           ".ballot-paper-mini-mark",
         );
-        if (mark) fadeOutMark(mark);
+        if (mark) fadeOutMark(mark, delayMs);
 
         flyTo(
           chip,
@@ -202,6 +220,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
           to,
           { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.15rem" },
           { backgroundColor: candidate.colour, borderWidth: "0px", borderRadius: "0px" },
+          delayMs,
         );
       }
     }
