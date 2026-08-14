@@ -72,6 +72,14 @@ describe("initIrvApp", () => {
     ).toBe(false);
   });
 
+  it("gives each recount fill element a height transition, so round changes are visibly smooth", () => {
+    const root = setUp();
+
+    expect(
+      root.querySelector<HTMLElement>('[data-fill-for="a"]')!.style.transition,
+    ).toContain("height");
+  });
+
   it("advances on click, showing the elimination and updated counts", () => {
     const root = setUp();
 
