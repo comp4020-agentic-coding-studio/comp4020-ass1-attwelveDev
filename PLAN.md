@@ -243,6 +243,14 @@ feature rule above.
   scoped to these fills, not a change to the shared CSS class, since
   explore/spoiler use the same class for continuously-dragged sliders
   where an animated height would feel laggy.
+- **Follow-up caught during browser verification: the new fill-height
+  transition ignored `prefers-reduced-motion`.** Every other drift/spring
+  animation in this codebase already falls back to an instant snap under
+  reduced motion; this one didn't. Fixed by computing `reducedMotion` in
+  `initIrvApp` (via the first fill element's `ownerDocument.defaultView`,
+  matching how `ballot-drift.ts`/`irv-drift.ts` derive it from an already-
+  queried element rather than assuming a global `document`) and only
+  setting the inline transition when motion isn't reduced.
 
 Checks:
 - `ballot-drift.test.ts` — the reduced-motion/no-`animate` landed-chip test
@@ -256,7 +264,8 @@ Checks:
   still created (snapped instantly, no `animate` call), replacing the old
   "suppressed entirely" assertion.
 - `irv-app.test.ts` — asserts a fill element's inline `style.transition`
-  contains `"height"` after `initIrvApp` runs.
+  contains `"height"` after `initIrvApp` runs, and that it does *not* under
+  `prefers-reduced-motion`.
 - `pnpm astro check` / `pnpm build` — typecheck and build stay clean; also
   confirms nothing else references the removed spoiler hero markup.
 - Manual browser pass at both marking viewports (`pnpm preview`): the hero
