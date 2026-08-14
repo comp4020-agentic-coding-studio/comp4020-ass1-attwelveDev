@@ -29,6 +29,12 @@ export function initApp(root: ParentNode, scenario: Scenario): void {
     if (id) countEls.set(id, el);
   }
 
+  const fillEls = new Map<CandidateId, HTMLElement>();
+  for (const el of root.querySelectorAll<HTMLElement>("[data-fill-for]")) {
+    const id = el.getAttribute("data-fill-for");
+    if (id) fillEls.set(id, el);
+  }
+
   const winnerEl = root.querySelector('[data-testid="winner"]');
 
   // Only the first preference in each synthetic ranking is ever read by
@@ -64,6 +70,14 @@ export function initApp(root: ParentNode, scenario: Scenario): void {
 
       const countEl = countEls.get(candidate.id);
       if (countEl) countEl.textContent = String(count);
+
+      const fillEl = fillEls.get(candidate.id);
+      if (fillEl) {
+        fillEl.style.setProperty(
+          "--fill-pct",
+          `${Math.round((count / total) * 100)}%`,
+        );
+      }
     }
 
     const winnerCandidate = candidatesById.get(currentWinner());

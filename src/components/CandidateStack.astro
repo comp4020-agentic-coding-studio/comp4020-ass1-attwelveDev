@@ -17,5 +17,8 @@ const { id, label, colour, shape } = Astro.props;
     aria-hidden="true"
   ></span>
   <span class="candidate-stack-label">{label}</span>
+  <div class="candidate-stack-bar">
+    <div class="candidate-stack-fill" data-fill-for={id} style={`--swatch-colour: ${colour};`}></div>
+  </div>
   <span class="candidate-stack-count" data-count-for={id}>0</span>
 </div>

@@ -1,0 +1,47 @@
+---
+import type { Candidate, CandidateId } from "../lib/types";
+
+interface Props {
+  candidates: Candidate[];
+  ranking: CandidateId[];
+  variant: "full" | "mini";
+  hero?: boolean;
+}
+const { candidates, ranking, variant, hero = false } = Astro.props;
+
+const candidatesById = new Map(candidates.map((c) => [c.id, c]));
+const first = candidatesById.get(ranking[0]);
+---
+
+{
+  variant === "full" ? (
+    <div class="ballot-paper ballot-paper-full" data-hero-ballot={hero ? ranking[0] : undefined}>
+      <p class="ballot-paper-heading">Ballot paper</p>
+      <ol class="ballot-paper-ranking">
+        {ranking.map((id) => {
+          const candidate = candidatesById.get(id);
+          if (!candidate) return null;
+          return (
+            <li>
+              <span
+                class={`candidate-stack-swatch candidate-stack-swatch-${candidate.shape}`}
+                style={`--swatch-colour: ${candidate.colour};`}
+                aria-hidden="true"
+              />
+              {candidate.label}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  ) : (
+    <span class="ballot-paper ballot-paper-mini" aria-hidden="true">
+      {first && (
+        <span
+          class={`ballot-paper-mini-mark candidate-stack-swatch candidate-stack-swatch-${first.shape}`}
+          style={`--swatch-colour: ${first.colour};`}
+        />
+      )}
+    </span>
+  )
+}

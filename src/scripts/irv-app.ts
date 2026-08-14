@@ -17,6 +17,14 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
     if (id) countEls.set(id, el);
   }
 
+  const fillEls = new Map<CandidateId, HTMLElement>();
+  for (const el of root.querySelectorAll<HTMLElement>("[data-fill-for]")) {
+    const id = el.getAttribute("data-fill-for");
+    if (id) fillEls.set(id, el);
+  }
+
+  const total = scenario.groups.reduce((sum, group) => sum + group.count, 0);
+
   const winnerEl = root.querySelector('[data-testid="winner"]');
   const statusEl = root.querySelector('[data-testid="round-status"]');
   const nextButton = root.querySelector<HTMLButtonElement>(
@@ -32,6 +40,14 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
     for (const [id, el] of countEls) {
       const count = round.counts[id];
       el.textContent = count === undefined ? "eliminated" : String(count);
+    }
+
+    for (const [id, fillEl] of fillEls) {
+      const count = round.counts[id] ?? 0;
+      fillEl.style.setProperty(
+        "--fill-pct",
+        `${Math.round((count / total) * 100)}%`,
+      );
     }
 
     if (statusEl) {

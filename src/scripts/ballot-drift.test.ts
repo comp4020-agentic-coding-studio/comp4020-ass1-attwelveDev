@@ -34,13 +34,10 @@ function setUp(reducedMotion: boolean, opts: { hero?: boolean } = {}) {
   );
   const { window } = dom;
   window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion });
-  const calledOn: unknown[] = [];
-  const animateSpy = vi.fn(function (this: unknown) {
-    calledOn.push(this);
-  });
+  const animateSpy = vi.fn();
   window.HTMLElement.prototype.animate = animateSpy;
   const root = window.document.querySelector("section")!;
-  return { root, animateSpy, calledOn };
+  return { root, animateSpy, calledOn: animateSpy.mock.contexts };
 }
 
 describe("initBallotDrift", () => {

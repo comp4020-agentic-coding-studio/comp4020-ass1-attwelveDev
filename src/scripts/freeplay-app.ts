@@ -61,6 +61,19 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
           label.className = "candidate-stack-label";
           label.textContent = candidate.label;
 
+          const bar = doc.createElement("div");
+          bar.className = "candidate-stack-bar";
+
+          const fill = doc.createElement("div");
+          fill.className = "candidate-stack-fill";
+          fill.dataset.fillFor = candidate.id;
+          fill.style.setProperty("--swatch-colour", candidate.colour);
+          fill.style.setProperty(
+            "--fill-pct",
+            `${Math.round((state.counts[candidate.id]! / total) * 100)}%`,
+          );
+          bar.append(fill);
+
           const count = doc.createElement("span");
           count.className = "candidate-stack-count";
           count.dataset.countFor = candidate.id;
@@ -78,7 +91,7 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
             render();
           });
 
-          stack.append(swatch, label, count, removeButton);
+          stack.append(swatch, label, bar, count, removeButton);
           return stack;
         }),
       );
