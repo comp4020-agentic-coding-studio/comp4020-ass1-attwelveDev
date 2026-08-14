@@ -126,6 +126,67 @@ Checks:
   shows visible numbers again; `prefers-reduced-motion` still snaps
   correctly in both directions with no layout breakage.
 
+## Feature: chips morph shape and flatten into the colour as they land
+
+Follow-up to the previous feature: landing on the fill rect fixed *where*
+chips land, but they still landed looking like a small white ballot-paper
+rectangle sitting on top of the colour, not joining it. The user's mental
+model is that the coloured bar *is* a stack of ballot papers seen edge-on,
+so a chip should morph its own shape continuously during flight and land as
+a flat, colour-matched line indistinguishable from the stack itself — no
+grey/white rectangle, no border, no separate swatch icon surviving to the
+end state.
+
+Added `springBoxKeyframes` to `spring.ts` alongside the existing
+`springTranslateKeyframes` — same analytic spring sampling, extended to
+`x`/`y`/`width`/`height` so a chip's position and size settle together.
+Colour/border aren't sampled per-frame; callers merge `backgroundColor`/
+`borderWidth`/`borderRadius` onto only the first and last keyframe and let
+WAAPI's native sparse-keyframe interpolation carry them smoothly across the
+timeline, keeping `spring.ts` a pure math module.
+
+Swarm chips (`ballot-drift.ts`) and IRV transfer chips (`irv-drift.ts`) both
+morph from their existing `.ballot-paper-mini` look (measured via
+`getBoundingClientRect()` right after appending, so the "from" shape is
+always the real rendered size, not a hardcoded rem→px guess) to a landed
+shape sized to the destination fill's real width, 3px tall
+(`LANDED_STRIP_HEIGHT_PX`), coloured to match the candidate, with no border
+or radius. Each chip's swatch mark fades to opacity 0 by the flight's
+midpoint, well before the box shrinks small enough for it to visibly clip.
+
+The hero handoff is the one place a genuinely full-size `.ballot-paper-full`
+illustration exists, so — per the user's explicit choice over a cheaper
+pre-shrunk-mini-chip alternative — it clones the actual rendered hero node
+(`hero.cloneNode(true)`, `overflow: hidden`) rather than swapping in a mini
+chip: its real heading and ranking list visibly shrink and clip away as the
+clone's height collapses toward the flattened line, and reappear as it
+grows back on the reverse flight. The clone's natural size is captured via
+`getBoundingClientRect()` immediately after appending (before any transform)
+and stored so the reverse flight can grow it back to that exact size.
+
+Checks:
+- `spring.test.ts` — `springBoxKeyframes` starts at the `from` box and ends
+  at the `to` box with the same frame count as an equivalent
+  `springTranslateKeyframes` call; holds width/height constant when `from`
+  and `to` sizes match.
+- `ballot-drift.test.ts` / `irv-drift.test.ts` — the existing no-`animate`
+  fallback landing test now also asserts the landed chip's inline
+  `width`/`height`/`backgroundColor`/`borderWidth`/`borderRadius` match the
+  fill's width, `LANDED_STRIP_HEIGHT_PX`, and the candidate's colour, and
+  that the swatch mark's opacity is `"0"`.
+- `ballot-drift.test.ts` — a hero-specific test asserts the forward flight's
+  chip carries `ballot-paper-full`'s class and contains the original ranking
+  list (a real clone, not a `.ballot-paper-mini`); a reverse test confirms
+  the chip's inline size/colour snap back to the clone's captured natural
+  width/height and white background once it scrolls back into view.
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean.
+- Manual browser pass at both marking viewports (`pnpm preview`): swarm and
+  IRV transfer chips visibly shrink and flatten into the colour with no
+  grey/white sliver left behind; the hero's real ballot content visibly
+  shrinks and clips away as it flies, reappearing when scrolling back up;
+  `prefers-reduced-motion` snaps straight to the flattened end state with no
+  flash of the old rectangle look.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
