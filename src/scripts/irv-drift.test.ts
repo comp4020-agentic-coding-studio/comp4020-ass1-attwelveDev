@@ -41,6 +41,21 @@ function immediateMajorityScenario(): Scenario {
   };
 }
 
+// d is weakest and eliminated round 1. Its 100 ballots split 99/1 between a
+// and b — a real, nonzero transfer to b, but small enough a share that a
+// plain largest-remainder split over a small chip budget rounds it to 0.
+function skewedTransferScenario(): Scenario {
+  return {
+    candidates: candidates(["a", "b", "d"]),
+    groups: [
+      { ranking: ["d", "a"], count: 99 },
+      { ranking: ["d", "b"], count: 1 },
+      { ranking: ["a"], count: 200 },
+      { ranking: ["b"], count: 200 },
+    ],
+  };
+}
+
 function markup(ids: string[]): string {
   const stacks = ids
     .map(
@@ -210,5 +225,71 @@ describe("initIrvDrift", () => {
     );
     const root = dom.window.document.querySelector("section")!;
     expect(() => initIrvDrift(root, threeCandidateScenario())).not.toThrow();
+  });
+
+  it("gives at least one chip to every candidate with a real, nonzero transfer, even a very small share", () => {
+    const { root, animateSpy } = setUp(["a", "b", "d"], false);
+    initIrvDrift(root, skewedTransferScenario());
+
+    clickNext(root);
+
+    expect(animateSpy).toHaveBeenCalled();
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="b"]').length,
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="a"]').length,
+    ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("captures the eliminated candidate's fill geometry before any other click listener can collapse it", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
+    );
+    const { window } = dom;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+
+    let collapsed = false;
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.getAttribute("data-fill-for") === "c") {
+        // Mirrors .candidate-stack-fill's real CSS (position: absolute;
+        // bottom: 0; height: var(--fill-pct)): once irv-app.ts's render()
+        // zeroes the eliminated candidate's --fill-pct, its box collapses
+        // to a zero-height sliver pinned to the same bottom edge.
+        return collapsed ? rect(392, 300, 40, 0) : rect(200, 300, 40, 192);
+      }
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 40);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0, 14, 19);
+    };
+
+    const animateSpy = vi.fn();
+    window.HTMLElement.prototype.animate = animateSpy;
+    const root = window.document.querySelector("section")!;
+
+    // Registered before initIrvDrift, mirroring bootstrap.ts calling
+    // initIrvApp first: its click listener's render() call collapses the
+    // eliminated candidate's fill height before initIrvDrift's own
+    // bubble-phase listener would otherwise read it.
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .addEventListener("click", () => {
+        collapsed = true;
+      });
+
+    initIrvDrift(root, threeCandidateScenario());
+    clickNext(root);
+
+    // animateSpy also catches fadeOutMark's opacity-only animation on each
+    // chip's mark span — find the chip-flight call specifically (its first
+    // keyframe carries a transform, fadeOutMark's doesn't).
+    const flightCall = animateSpy.mock.calls.find((call) =>
+      "transform" in (call[0] as Array<Record<string, unknown>>)[0],
+    );
+    expect(flightCall).toBeDefined();
+    const frames = flightCall![0] as Array<Record<string, unknown>>;
+    expect(frames[0].transform).toBe("translate(300px, 200px)");
   });
 });
