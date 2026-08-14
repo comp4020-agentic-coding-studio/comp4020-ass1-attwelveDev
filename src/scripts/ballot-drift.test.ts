@@ -391,7 +391,7 @@ describe("initBallotDrift", () => {
     ).not.toBeNull();
   });
 
-  it("fades the hero back in and flies its chip home once it scrolls back into view", async () => {
+  it("keeps the hero hidden until its return flight actually lands, so the two are never both visible", async () => {
     const { FakeObserver, instances } = fakeIntersectionObserver();
     const { heroRoot, targetRoot, window, animateSpy } = setUp(false, {
       hero: true,
@@ -406,10 +406,17 @@ describe("initBallotDrift", () => {
     heroObserver.trigger(hero, false);
     heroObserver.trigger(hero, true);
 
-    const heroFadeCalls = animateSpy.mock.contexts.filter(
-      (el) => el === hero,
-    ).length;
-    expect(heroFadeCalls).toBe(2);
+    function heroFadeCalls(): number {
+      return animateSpy.mock.contexts.filter((el) => el === hero).length;
+    }
+
+    // The clone is still mid-flight back toward the hero's position here --
+    // revealing the real hero already would show both on screen at once.
+    expect(heroFadeCalls()).toBe(1);
+
+    await vi.waitFor(() => {
+      expect(heroFadeCalls()).toBe(2);
+    });
     await vi.waitFor(() => {
       expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
     });
