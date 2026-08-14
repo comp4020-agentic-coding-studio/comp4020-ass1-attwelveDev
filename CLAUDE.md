@@ -34,6 +34,14 @@ and see `spec/README.md` for how the checks in this repo relate to it.
   you the file, the line, or the contract. Treat a red check as authoritative
   --- the page is wrong until the check is green, not until you decide it should
   be.
+- Keep `PLAN.md` current. Before building a feature, write or update its
+  entry in `PLAN.md` --- what it does, why, and what "done" looks like --- and
+  name the check that will prove it: a `spec/*.test.ts` assertion, a
+  co-located unit test, or (for things a test can't reach, like an animation
+  or a layout at a marking viewport) an explicit manual browser pass. A
+  feature with no corresponding check in `PLAN.md` isn't planned yet, it's
+  just started. Update the plan as you build, not just before --- if reality
+  disagrees with what's written, the file is wrong, not the code.
 - Commit when the checks pass. Never commit a red state.
 
 ## The checks (your sensors)
