@@ -239,8 +239,10 @@ button:disabled {
 }
 
 .candidate-stack-count {
+  min-width: 6rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  text-align: center;
 }
 
 .candidate-stack-leader-badge {
