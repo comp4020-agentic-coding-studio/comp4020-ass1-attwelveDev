@@ -225,6 +225,29 @@ export function initBallotDrift(
     }
   }
 
+  // The swarm's landed chips are a fixed-pixel illustration of the *starting*
+  // distribution, captured once. Once the reader actually starts adjusting a
+  // candidate's count, that illustration no longer matches the live fill it
+  // was laid over — instead of repositioning it in step with every drag, it
+  // simply retires (fades away) the first time the reader touches a slider,
+  // leaving the live fill as the only thing describing the current counts.
+  function clearSwarm(): void {
+    const chips = container!.querySelectorAll<HTMLElement>(".ballot-paper-mini");
+    for (const chip of chips) {
+      if (reducedMotion || typeof chip.animate !== "function") {
+        chip.remove();
+        continue;
+      }
+      const animation = chip.animate([{ opacity: 1 }, { opacity: 0 }], {
+        duration: HERO_FADE_DURATION_MS,
+        fill: "forwards",
+      });
+      void animation.finished.then(() => chip.remove()).catch(() => {});
+    }
+  }
+
+  targetRoot.addEventListener("input", clearSwarm, { once: true });
+
   if (typeof view.IntersectionObserver === "function") {
     const swarmObserver = new view.IntersectionObserver(
       (entries) => {
