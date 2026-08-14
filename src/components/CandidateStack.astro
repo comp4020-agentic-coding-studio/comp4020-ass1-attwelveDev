@@ -12,53 +12,10 @@ const { id, label, colour, shape } = Astro.props;
 
 <div class="candidate-stack" data-candidate={id}>
   <span
-    class={`candidate-stack__swatch candidate-stack__swatch--${shape}`}
+    class={`candidate-stack-swatch candidate-stack-swatch-${shape}`}
     style={`--swatch-colour: ${colour};`}
     aria-hidden="true"
   ></span>
-  <span class="candidate-stack__label">{label}</span>
-  <span class="candidate-stack__count" data-count-for={id}>0</span>
+  <span class="candidate-stack-label">{label}</span>
+  <span class="candidate-stack-count" data-count-for={id}>0</span>
 </div>
-
-<style>
-  .candidate-stack {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
-  }
-
-  .candidate-stack__swatch {
-    display: inline-block;
-    width: 1rem;
-    height: 1rem;
-    flex-shrink: 0;
-    background-color: var(--swatch-colour);
-  }
-
-  .candidate-stack__swatch--circle {
-    border-radius: 50%;
-  }
-
-  .candidate-stack__swatch--square {
-    border-radius: 0;
-  }
-
-  .candidate-stack__swatch--triangle {
-    width: 0;
-    height: 0;
-    background-color: transparent;
-    border-left: 0.5rem solid transparent;
-    border-right: 0.5rem solid transparent;
-    border-bottom: 1rem solid var(--swatch-colour);
-  }
-
-  .candidate-stack__label {
-    flex: 1;
-  }
-
-  .candidate-stack__count {
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-  }
-</style>

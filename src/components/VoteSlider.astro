@@ -12,19 +12,6 @@ const { id, label } = Astro.props;
   just a valid-markup placeholder until initApp runs.
 -->
 <label class="vote-slider">
-  <span class="vote-slider__label">{label}</span>
+  <span class="vote-slider-label">{label}</span>
   <input type="range" data-slider-for={id} min="0" max="1" value="0" />
 </label>
-
-<style>
-  .vote-slider {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.5rem 0;
-  }
-
-  .vote-slider input[type="range"] {
-    width: 100%;
-  }
-</style>
