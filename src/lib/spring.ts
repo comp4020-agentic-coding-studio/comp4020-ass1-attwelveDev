@@ -71,3 +71,34 @@ export function springTranslateKeyframes(
     offset: i / (xs.length - 1),
   }));
 }
+
+export interface BoxState {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Same analytic sampling as springTranslateKeyframes, plus width/height so a
+// chip can spring-morph its own shape (not just position) over the same
+// flight — the position and size settle together, driven by the same spring
+// options. Colour/border aren't sampled here; callers layer those onto the
+// first/last keyframe and let WAAPI interpolate them natively.
+export function springBoxKeyframes(
+  from: BoxState,
+  to: BoxState,
+  options: SpringOptions,
+  duration = 0.6,
+  fps = 60,
+): Keyframe[] {
+  const xs = springValues(from.x, to.x, options, duration, fps);
+  const ys = springValues(from.y, to.y, options, duration, fps);
+  const widths = springValues(from.width, to.width, options, duration, fps);
+  const heights = springValues(from.height, to.height, options, duration, fps);
+  return xs.map((x, i) => ({
+    transform: `translate(${x}px, ${ys[i]}px)`,
+    width: `${widths[i]}px`,
+    height: `${heights[i]}px`,
+    offset: i / (xs.length - 1),
+  }));
+}
