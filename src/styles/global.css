@@ -14,3 +14,9 @@ main {
 a {
   color: #0b5fff;
 }
+
+.ballot-comparison {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}

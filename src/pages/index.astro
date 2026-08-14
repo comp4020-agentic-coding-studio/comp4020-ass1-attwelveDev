@@ -3,6 +3,12 @@ import "../styles/global.css";
 import CandidateStack from "../components/CandidateStack.astro";
 import VoteSlider from "../components/VoteSlider.astro";
 import { scenarioExplore } from "../data/scenario-explore";
+import { scenarioSpoiler } from "../data/scenario-spoiler";
+import { strategicBallot } from "../data/sample-ballot-strategic";
+
+const candidateLabels = new Map(
+  scenarioSpoiler.candidates.map((c) => [c.id, c.label]),
+);
 ---
 
 <!doctype html>
@@ -27,26 +33,110 @@ import { scenarioExplore } from "../data/scenario-explore";
           first-past-the-post only a voter's first preference is ever
           counted. Try it yourself — move the sliders and watch who's ahead.
         </p>
-        <div class="stacks">
-          {
-            scenarioExplore.candidates.map((candidate) => (
-              <CandidateStack
-                id={candidate.id}
-                label={candidate.label}
-                colour={candidate.colour}
-                shape={candidate.shape}
-              />
-            ))
-          }
+        <div id="explore-app">
+          <div class="stacks">
+            {
+              scenarioExplore.candidates.map((candidate) => (
+                <CandidateStack
+                  id={candidate.id}
+                  label={candidate.label}
+                  colour={candidate.colour}
+                  shape={candidate.shape}
+                />
+              ))
+            }
+          </div>
+          <p data-testid="winner"></p>
+          <div class="sliders">
+            {
+              scenarioExplore.candidates.map((candidate) => (
+                <VoteSlider id={candidate.id} label={candidate.label} />
+              ))
+            }
+          </div>
         </div>
-        <p data-testid="winner"></p>
-        <div class="sliders">
-          {
-            scenarioExplore.candidates.map((candidate) => (
-              <VoteSlider id={candidate.id} label={candidate.label} />
-            ))
-          }
+      </section>
+
+      <section aria-labelledby="spoiler-heading">
+        <h2 id="spoiler-heading">Where first-past-the-post goes wrong</h2>
+        <p>
+          Now here's one particular election. Aster and Birch are similar
+          candidates who split a majority that would rather see either of
+          them win over Cedar — so under first-past-the-post, Cedar takes it
+          on a minority of first preferences. Try the sliders: as long as
+          Aster and Birch are close together, Cedar keeps winning even though
+          most voters prefer someone else.
+        </p>
+        <div id="spoiler-app">
+          <div class="stacks">
+            {
+              scenarioSpoiler.candidates.map((candidate) => (
+                <CandidateStack
+                  id={candidate.id}
+                  label={candidate.label}
+                  colour={candidate.colour}
+                  shape={candidate.shape}
+                />
+              ))
+            }
+          </div>
+          <p data-testid="winner"></p>
+          <div class="sliders">
+            {
+              scenarioSpoiler.candidates.map((candidate) => (
+                <VoteSlider id={candidate.id} label={candidate.label} />
+              ))
+            }
+          </div>
         </div>
+      </section>
+
+      <section aria-labelledby="strategic-heading">
+        <h2 id="strategic-heading">Why voters vote tactically</h2>
+        <p>
+          Under first-past-the-post, a vote for a candidate who can't win is a
+          vote that changes nothing. Take one Birch supporter from the
+          scenario above: Birch is the weaker of the two similar candidates,
+          so backing them sincerely leaves Cedar's plurality untouched.
+          Backing Aster instead — their genuine second choice — actually
+          changes the outcome.
+        </p>
+        <div class="ballot-comparison">
+          <div>
+            <h3>Sincere vote</h3>
+            <ol>
+              {
+                strategicBallot.sincereRanking.map((id) => (
+                  <li>{candidateLabels.get(id)}</li>
+                ))
+              }
+            </ol>
+          </div>
+          <div>
+            <h3>Tactical vote</h3>
+            <ol>
+              {
+                strategicBallot.tacticalRanking.map((id) => (
+                  <li>{candidateLabels.get(id)}</li>
+                ))
+              }
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="duverger-heading">
+        <h2 id="duverger-heading">Why elections converge to two parties</h2>
+        <p>
+          This is the pattern behind Duverger's law: when voters know that
+          backing their sincere favourite can hand the win to their least
+          preferred candidate, they drift toward whichever of the two
+          strongest contenders they dislike least. Over enough elections,
+          first-past-the-post tends to squeeze out third parties and settle
+          into a two-party contest — not because voters stop having a wider
+          range of preferences, but because the system only ever listens to
+          the first one.
+        </p>
       </section>
     </main>
     <script>

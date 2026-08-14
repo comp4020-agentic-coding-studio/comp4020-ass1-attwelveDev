@@ -18,6 +18,10 @@ import { scenarioExplore } from "../src/data/scenario-explore";
 //   that candidate's current vote count
 // - one `[data-testid="winner"]` element showing the current winner's label
 // - moving a slider (an "input" event) recomputes counts and winner in place
+//
+// Scoped to #explore-app specifically (not the whole document) because the
+// real page now hosts a second, independent initApp instance for the spoiler
+// scenario — this matches how src/scripts/bootstrap.ts actually calls it.
 
 describe("the visitor changes what they see", () => {
   it("updates the vote counts and winner when a slider moves", () => {
@@ -26,20 +30,22 @@ describe("the visitor changes what they see", () => {
       url: "http://localhost/",
     });
     const document = dom.window.document;
+    const exploreRoot = document.querySelector("#explore-app")!;
+    expect(exploreRoot).toBeTruthy();
 
-    initApp(document, scenarioExplore);
+    initApp(exploreRoot, scenarioExplore);
 
-    const sliders = document.querySelectorAll<HTMLInputElement>(
+    const sliders = exploreRoot.querySelectorAll<HTMLInputElement>(
       'input[type="range"][data-slider-for]',
     );
     expect(sliders.length).toBeGreaterThan(1);
 
-    const winner = document.querySelector('[data-testid="winner"]');
+    const winner = exploreRoot.querySelector('[data-testid="winner"]');
     expect(winner).toBeTruthy();
     const winnerBefore = winner!.textContent;
 
     const firstCandidateId = sliders[0].dataset.sliderFor!;
-    const countBefore = document.querySelector(
+    const countBefore = exploreRoot.querySelector(
       `[data-count-for="${firstCandidateId}"]`,
     )!.textContent;
 
@@ -50,10 +56,10 @@ describe("the visitor changes what they see", () => {
     sliders[0].value = sliders[0].max;
     sliders[0].dispatchEvent(new dom.window.Event("input", { bubbles: true }));
 
-    const countAfter = document.querySelector(
+    const countAfter = exploreRoot.querySelector(
       `[data-count-for="${firstCandidateId}"]`,
     )!.textContent;
-    const winnerAfter = document.querySelector(
+    const winnerAfter = exploreRoot.querySelector(
       '[data-testid="winner"]',
     )!.textContent;
 
