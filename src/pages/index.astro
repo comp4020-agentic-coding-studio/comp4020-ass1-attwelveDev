@@ -26,14 +26,17 @@ const candidateLabels = new Map(
     </header>
     <main>
       <h1>Who Really Won?</h1>
-      <section aria-labelledby="explore-heading">
-        <h2 id="explore-heading">How first-past-the-post works</h2>
-        <p>
-          Every voter ranks the candidates in order, but under
-          first-past-the-post only a voter's first preference is ever
-          counted. Try it yourself — move the sliders and watch who's ahead.
-        </p>
-        <div id="explore-app">
+      <section class="chapter" aria-labelledby="explore-heading">
+        <div class="chapter-prose">
+          <p>
+            Every voter ranks the candidates in order, but under
+            first-past-the-post only a voter's first preference is ever
+            counted. Try it yourself — move the sliders and watch who's
+            ahead.
+          </p>
+        </div>
+        <div class="chapter-viz" id="explore-app">
+          <h2 id="explore-heading">How first-past-the-post works</h2>
           <div class="stacks" data-ballot-drift>
             {
               scenarioExplore.candidates.map((candidate) => (
@@ -57,17 +60,19 @@ const candidateLabels = new Map(
         </div>
       </section>
 
-      <section aria-labelledby="spoiler-heading">
-        <h2 id="spoiler-heading">Where first-past-the-post goes wrong</h2>
-        <p>
-          Now here's one particular election. Aster and Birch are similar
-          candidates who split a majority that would rather see either of
-          them win over Cedar — so under first-past-the-post, Cedar takes it
-          on a minority of first preferences. Try the sliders: as long as
-          Aster and Birch are close together, Cedar keeps winning even though
-          most voters prefer someone else.
-        </p>
-        <div id="spoiler-app">
+      <section class="chapter" aria-labelledby="spoiler-heading">
+        <div class="chapter-prose">
+          <p>
+            Now here's one particular election. Aster and Birch are similar
+            candidates who split a majority that would rather see either of
+            them win over Cedar — so under first-past-the-post, Cedar takes
+            it on a minority of first preferences. Try the sliders: as long
+            as Aster and Birch are close together, Cedar keeps winning even
+            though most voters prefer someone else.
+          </p>
+        </div>
+        <div class="chapter-viz" id="spoiler-app">
+          <h2 id="spoiler-heading">Where first-past-the-post goes wrong</h2>
           <div class="stacks" data-ballot-drift>
             {
               scenarioSpoiler.candidates.map((candidate) => (
@@ -91,36 +96,40 @@ const candidateLabels = new Map(
         </div>
       </section>
 
-      <section aria-labelledby="strategic-heading">
-        <h2 id="strategic-heading">Why voters vote tactically</h2>
-        <p>
-          Under first-past-the-post, a vote for a candidate who can't win is a
-          vote that changes nothing. Take one Birch supporter from the
-          scenario above: Birch is the weaker of the two similar candidates,
-          so backing them sincerely leaves Cedar's plurality untouched.
-          Backing Aster instead — their genuine second choice — actually
-          changes the outcome.
-        </p>
-        <div class="ballot-comparison">
-          <div>
-            <h3>Sincere vote</h3>
-            <ol>
-              {
-                strategicBallot.sincereRanking.map((id) => (
-                  <li>{candidateLabels.get(id)}</li>
-                ))
-              }
-            </ol>
-          </div>
-          <div>
-            <h3>Tactical vote</h3>
-            <ol>
-              {
-                strategicBallot.tacticalRanking.map((id) => (
-                  <li>{candidateLabels.get(id)}</li>
-                ))
-              }
-            </ol>
+      <section class="chapter" aria-labelledby="strategic-heading">
+        <div class="chapter-prose">
+          <p>
+            Under first-past-the-post, a vote for a candidate who can't win
+            is a vote that changes nothing. Take one Birch supporter from the
+            scenario above: Birch is the weaker of the two similar
+            candidates, so backing them sincerely leaves Cedar's plurality
+            untouched. Backing Aster instead — their genuine second choice —
+            actually changes the outcome.
+          </p>
+        </div>
+        <div class="chapter-viz">
+          <h2 id="strategic-heading">Why voters vote tactically</h2>
+          <div class="ballot-comparison">
+            <div>
+              <h3>Sincere vote</h3>
+              <ol>
+                {
+                  strategicBallot.sincereRanking.map((id) => (
+                    <li>{candidateLabels.get(id)}</li>
+                  ))
+                }
+              </ol>
+            </div>
+            <div>
+              <h3>Tactical vote</h3>
+              <ol>
+                {
+                  strategicBallot.tacticalRanking.map((id) => (
+                    <li>{candidateLabels.get(id)}</li>
+                  ))
+                }
+              </ol>
+            </div>
           </div>
         </div>
       </section>
@@ -139,16 +148,18 @@ const candidateLabels = new Map(
         </p>
       </section>
 
-      <section aria-labelledby="recount-heading">
-        <h2 id="recount-heading">Recounting the same election under IRV</h2>
-        <p>
-          Here's that same election again, but counted a different way.
-          Instant-runoff voting uses every voter's full ranking: if no one has
-          a majority of first preferences, the last-place candidate is
-          eliminated and their ballots move to each voter's next choice.
-          Step through the recount and watch who wins this time.
-        </p>
-        <div id="recount-app">
+      <section class="chapter" aria-labelledby="recount-heading">
+        <div class="chapter-prose">
+          <p>
+            Here's that same election again, but counted a different way.
+            Instant-runoff voting uses every voter's full ranking: if no one
+            has a majority of first preferences, the last-place candidate is
+            eliminated and their ballots move to each voter's next choice.
+            Step through the recount and watch who wins this time.
+          </p>
+        </div>
+        <div class="chapter-viz" id="recount-app">
+          <h2 id="recount-heading">Recounting the same election under IRV</h2>
           <div class="stacks">
             {
               scenarioSpoiler.candidates.map((candidate) => (
