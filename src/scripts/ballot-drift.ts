@@ -235,7 +235,11 @@ export function initBallotDrift(
           }
         }
       },
-      { threshold: 0.3 },
+      // rootMargin shrinks the effective root to the central 30% band of the
+      // viewport, so the swarm needs the reader to have actually scrolled
+      // this container into view, not merely tag its bottom edge while it's
+      // still peeking up from below.
+      { threshold: 0, rootMargin: "-35% 0px -35% 0px" },
     );
     swarmObserver.observe(container);
   } else {
@@ -253,6 +257,7 @@ export function initBallotDrift(
     chip: HTMLElement;
     naturalSize: { width: number; height: number };
     animation: Animation | null;
+    to: BoxState;
   }
 
   let heroFlight: HeroFlight | null = null;
@@ -404,7 +409,7 @@ export function initBallotDrift(
       heroLandedStyle(heroCandidate!.colour),
       true,
     );
-    heroFlight = { chip, naturalSize, animation };
+    heroFlight = { chip, naturalSize, animation, to };
 
     await finished;
     if (heroFlight?.animation === animation) {
@@ -452,7 +457,7 @@ export function initBallotDrift(
       heroHomeStyle(),
       false,
     );
-    heroFlight = { chip, naturalSize, animation };
+    heroFlight = { chip, naturalSize, animation, to };
 
     await finished;
     if (heroFlight?.animation === animation) {
@@ -460,6 +465,55 @@ export function initBallotDrift(
       heroFlight = null;
     }
   }
+
+  // Sticky-pinned .chapter-viz panels mean the hero's and its landing
+  // target's on-screen positions aren't stable while a flight is mid-air:
+  // a fast scroll can move the true destination well before the fixed
+  // 600ms flight this animation was built for has finished. Re-sample the
+  // true destination on every scroll tick and redirect the running flight
+  // if it's drifted, the same way an interrupted direction-reversal already
+  // redirects mid-flight.
+  function retargetActiveFlight(): void {
+    if (!heroFlight || heroFlight.animation?.playState !== "running") return;
+
+    const { chip, naturalSize, to: previousTo } = heroFlight;
+    const to = heroAway
+      ? landedBoxFor(naturalSize)
+      : { ...heroOrigin(), ...naturalSize };
+
+    const EPSILON_PX = 1;
+    if (
+      Math.abs(to.x - previousTo.x) < EPSILON_PX &&
+      Math.abs(to.y - previousTo.y) < EPSILON_PX
+    ) {
+      return;
+    }
+
+    const from = currentHeroBox(chip);
+    heroFlight.animation?.cancel?.();
+
+    const edgeStyle = heroAway
+      ? heroLandedStyle(heroCandidate!.colour)
+      : heroHomeStyle();
+    const { animation, finished } = runHeroFlight(
+      chip,
+      from,
+      to,
+      edgeStyle,
+      edgeStyle,
+      heroAway,
+    );
+    heroFlight = { chip, naturalSize, animation, to };
+
+    void finished.then(() => {
+      if (heroFlight?.animation === animation) {
+        chip.remove();
+        heroFlight = null;
+      }
+    });
+  }
+
+  view.addEventListener("scroll", retargetActiveFlight);
 
   if (typeof view.IntersectionObserver === "function") {
     let hasObservedHero = false;
