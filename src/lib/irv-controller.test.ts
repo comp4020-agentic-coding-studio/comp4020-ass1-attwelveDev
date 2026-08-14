@@ -26,15 +26,16 @@ const threeCandidateScenario: Scenario = {
 };
 
 describe("createIrvController", () => {
-  it("starts at the first round, with no winner declared yet", () => {
+  it("starts at the first round, with no winner or elimination declared yet", () => {
     const controller = createIrvController(threeCandidateScenario);
     expect(controller.roundIndex).toBe(0);
     expect(controller.currentRound.counts).toEqual({ a: 40, b: 35, c: 25 });
     expect(controller.isFinal).toBe(false);
     expect(controller.winner).toBeNull();
+    expect(controller.justEliminated).toBeNull();
   });
 
-  it("advances to the next round, revealing the winner once final", () => {
+  it("advances to the next round, revealing the winner and who was just eliminated", () => {
     const controller = createIrvController(threeCandidateScenario);
     const advanced = controller.next();
     expect(advanced).toBe(true);
@@ -42,6 +43,7 @@ describe("createIrvController", () => {
     expect(controller.currentRound.counts).toEqual({ a: 65, b: 35 });
     expect(controller.isFinal).toBe(true);
     expect(controller.winner).toBe("a");
+    expect(controller.justEliminated).toBe("c");
   });
 
   it("won't advance past the final round", () => {
