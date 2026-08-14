@@ -187,6 +187,86 @@ Checks:
   `prefers-reduced-motion` snaps straight to the flattened end state with no
   flash of the old rectangle look.
 
+## Feature: bug fixes from the first manual pass over the morph/flatten feature
+
+The morph/flatten feature shipped and passed a background browser-
+verification pass, but a manual read-through of the live page turned up five
+real problems (plus a content question), each traced to a specific root
+cause rather than retuned by feel, per the animation-is-a-first-class-
+feature rule above.
+
+- **Hero clone left a visible remnant instead of fading out.** The flight
+  animated `width`/`height` down to the flattened strip height but never
+  touched `padding`, so under `box-sizing: border-box` the clone could only
+  ever shrink to its padding sum (24px) — the original ballot text stayed
+  legible on top of the candidate colour. Fixed by animating padding to `0`
+  alongside the box morph, and by folding a post-landing opacity fade into
+  the *same* `Animation` object as the flight (not a separate one) so an
+  uninterrupted forward flight removes its clone once it lands — the
+  stack's own fill is what represents the vote from then on.
+- **Reverse flight undershot the real ballot's width.** `flyForward` set
+  `clone.style.boxSizing = "border-box"` *before* measuring the clone's
+  natural size, so the same `width: 12rem` measured 34px short of the real
+  hero's true (content-box) rendered width. Fixed by measuring before
+  switching box-sizing.
+- **Fast scrolling didn't track the ballot.** `heroAway` flipped
+  synchronously but the underlying 600ms `Animation` didn't, so scrolling
+  past the hero's visibility threshold twice inside that window started a
+  second, competing `Animation` on the same clone. Fixed by tracking one
+  clone and its currently-playing `Animation` together; redirecting mid-
+  flight now reads the clone's actual current box via
+  `getBoundingClientRect()`, cancels the old `Animation`, and continues from
+  there — a continuation, never a race.
+- **Spurious flight on page load.** `IntersectionObserver`'s very first
+  callback just reports whatever state the hero happens to be in at
+  `observe()`-time (e.g. already below the fold), which the code was
+  treating identically to a real scroll transition. Fixed by ignoring the
+  observer's first callback outright.
+- **The spoiler section had a hero ballot that didn't serve its point.**
+  FPTP vote-splitting is a property of a whole electorate, not any one
+  voter's ranking, so `#spoiler-chapter`'s `<BallotPaper hero>` was removed
+  from `index.astro`; `bootstrap.ts` now calls
+  `initBallotDrift(null, spoilerRoot, scenarioSpoiler)` — `heroRoot: null`
+  is the same already-supported "swarm lands, no hero handling attempted"
+  mode used elsewhere.
+- **IRV elimination read as "hit or miss."** Two compounding causes: (1)
+  `irv-drift.ts` returned early under `prefers-reduced-motion` *before*
+  spawning any chips at all, unlike the swarm/hero which still degrade to
+  an instant final placement; (2) `.candidate-stack-fill`'s height had no
+  transition, so the actual stack bars snapped instantly on every round,
+  leaving a decorative sample of up to 12 chips (which can be 0–2 for an
+  uneven split) as the only visible signal that votes moved. Fixed by
+  pushing the reduced-motion check down into `flyTo`/`fadeOutMark`'s own
+  instant-placement fallback (spawn always happens, motion is what's
+  conditional), and by giving each recount fill element an inline
+  `transition: height 600ms ease` set once during `initIrvApp`'s setup —
+  scoped to these fills, not a change to the shared CSS class, since
+  explore/spoiler use the same class for continuously-dragged sliders
+  where an animated height would feel laggy.
+
+Checks:
+- `ballot-drift.test.ts` — the reduced-motion/no-`animate` landed-chip test
+  now also asserts padding is zeroed; a new test drives a fake `Animation`
+  whose `finished` promise never resolves, redirects mid-flight, and
+  asserts the prior `Animation`'s `cancel()` was called and only one clone
+  exists; a new test asserts the observer's first callback doesn't trigger
+  a flight but a subsequent one does; a new test asserts an uninterrupted
+  forward flight removes its clone from the DOM (via `vi.waitFor`).
+- `irv-drift.test.ts` — the reduced-motion test now asserts chips *are*
+  still created (snapped instantly, no `animate` call), replacing the old
+  "suppressed entirely" assertion.
+- `irv-app.test.ts` — asserts a fill element's inline `style.transition`
+  contains `"height"` after `initIrvApp` runs.
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean; also
+  confirms nothing else references the removed spoiler hero markup.
+- Manual browser pass at both marking viewports (`pnpm preview`): the hero
+  clone fully disappears with no remnant once it lands; scrolling back up
+  grows it back to the real ballot's exact width; rapid up/down scrolling
+  keeps the flight visually attached to the real ballot; the spoiler
+  section shows no hero ballot; clicking through IRV rounds shows the
+  actual stack bars smoothly draining/filling on every elimination,
+  reduced-motion included.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
