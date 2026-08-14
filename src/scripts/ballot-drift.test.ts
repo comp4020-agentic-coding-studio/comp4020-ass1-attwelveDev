@@ -560,6 +560,18 @@ describe("initBallotDrift", () => {
     expect(swarmObserver.options?.rootMargin).toBe("-35% 0px -35% 0px");
   });
 
+  it("requires the hero to be substantially in view, not merely peeking at the edge, before it flies back -- so a quick scroll up then down doesn't retrigger it early", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false, { hero: true });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+    expect(heroObserver.options?.rootMargin).toBe("-35% 0px -35% 0px");
+  });
+
   it("redirects an in-flight hero flight toward a moved destination on scroll, instead of continuing toward a stale target", () => {
     const { FakeObserver, instances } = fakeIntersectionObserver();
     const { heroRoot, targetRoot, window } = setUp(false, { hero: true });
