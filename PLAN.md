@@ -44,6 +44,39 @@ partisan. Kept to one mechanic reused twice, not two separate explainers.
 5. **Takeaway + free play.** A closing line, then a free-play mode: the reader
    can add or remove candidates and freely adjust votes, no scripted outcome.
 
+## Feature: ballot-mechanics intro chapters
+
+Before "How FPTP works" and before "Recounting the same election under IRV",
+a standalone chapter shows how that system's ballot itself works — a voter
+ticking one box for FPTP, a voter numbering every candidate for IRV — using
+the same `BallotPaper` object as the hero. On scroll, that hero fades and a
+chip flies forward onto the next chapter's stacks (reusing the drift
+mechanic from `ballot-drift.ts`, now split into a `heroRoot` separate from
+the `targetRoot` it animates into, since the hero and its target stacks now
+live in genuinely different chapters).
+
+Why: the piece was explaining *how the count works* without ever showing
+*how the ballot itself works* — readers were asked to interpret a numbered
+or ticked ballot paper before being told what marking it even means.
+Restructuring also surfaced and fixed a real bug: the hero ballot lived as a
+sibling of `#explore-app`/`#recount-app`, not a descendant, so
+`root.querySelector` never found it and the fade+fly silently never fired in
+production, even though the unit test's fixture (hero and container as
+siblings under one root that *was* passed directly) didn't catch it.
+
+Checks:
+- `ballot-drift.test.ts` — cross-root case (hero in a separate `<section>`
+  from the stacks) proves the fade+fly still fires; a `heroRoot: null` case
+  proves the swarm still lands with no hero handling attempted.
+- `pnpm astro check` / `pnpm build` — catches prop-typing/markup mistakes in
+  the new `mode` prop and the `index.astro` restructure.
+- Manual browser pass at both marking viewports (`pnpm preview`): tick-box
+  ballot renders one checked box in fixed candidate order; numbered ballot
+  unchanged; the hero-only `.chapter-viz` doesn't blow the mobile 40vh cap;
+  the hero visibly fades and a chip flies into the next chapter's stack on
+  scroll (confirms the bug fix); `prefers-reduced-motion` collapses all of
+  it to an instant final state.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
