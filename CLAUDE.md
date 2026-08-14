@@ -44,6 +44,35 @@ and see `spec/README.md` for how the checks in this repo relate to it.
   disagrees with what's written, the file is wrong, not the code.
 - Commit when the checks pass. Never commit a red state.
 
+## Animation is a first-class feature, not garnish
+
+Animation is one of the things meant to make this prototype stand out, and
+in this piece it does real work: a ballot flying from one section into a
+candidate's stack is *how* the reader is shown that ballot belongs there.
+Motion here is argument, not decoration — hold it to a real bar, not a
+vibe check.
+
+- **Not green until watched.** A passing test proves the keyframes/values
+  are correct; it doesn't prove the motion looks right. No animation is
+  done until someone has watched it play, full duration, in a real browser
+  (`pnpm preview`) at both marking viewports. That's the actual check for
+  this class of bug — `PLAN.md`'s "manual browser pass" line for each
+  feature is not optional polish, it's the check unit tests can't do.
+- **Janky is a bug, not a taste call.** If it stutters or looks wrong,
+  something specific is wrong: competing animations forcing layout thrash,
+  a duration that doesn't match the distance/scale of the move, too many
+  properties changing on one element at once, an easing curve fighting the
+  direction of travel. Diagnose which one and fix that, rather than
+  retuning numbers by feel until it seems okay.
+- **Every animation should answer "what is this telling the reader?"** If
+  the motion doesn't map onto a fact or relationship the reader should take
+  away (this ballot belongs to that stack; this candidate's votes just
+  transferred there), it's decoration — cut it or simplify it rather than
+  keep it for visual appeal alone.
+- **When the same fix keeps getting reapplied by hand, it belongs in the
+  shared helper** (`spring.ts`), not scattered per-call tweaks — that's the
+  difference between fixing an animation and fixing animation.
+
 ## The checks (your sensors)
 
 CI runs these on every push once your repo is public. GitHub's checks UI shows
