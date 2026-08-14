@@ -76,37 +76,11 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
             "--fill-pct",
             `${Math.round((count / total) * 100)}%`,
           );
-          bar.append(fill);
-
-          const countEl = doc.createElement("span");
-          countEl.className = "candidate-stack-count";
-          countEl.dataset.countFor = candidate.id;
-          countEl.textContent = String(count);
-
-          const removeButton = doc.createElement("button");
-          removeButton.type = "button";
-          removeButton.dataset.action = "remove-candidate";
-          removeButton.dataset.candidateId = candidate.id;
-          removeButton.textContent = `Remove ${candidate.label}`;
-          removeButton.disabled =
-            state.candidates.length <= FREEPLAY_MIN_CANDIDATES;
-          removeButton.addEventListener("click", () => {
-            state = removeCandidate(state, candidate.id, total);
-            render();
-          });
-
-          stack.append(swatch, label, bar, countEl, removeButton);
-
-          const sliderWrapper = doc.createElement("label");
-          sliderWrapper.className = "vote-slider";
-
-          const sliderLabel = doc.createElement("span");
-          sliderLabel.className = "vote-slider-label";
-          sliderLabel.textContent = candidate.label;
-
           const slider = doc.createElement("input");
           slider.type = "range";
+          slider.className = "candidate-stack-slider";
           slider.dataset.sliderFor = candidate.id;
+          slider.setAttribute("aria-label", candidate.label);
           slider.min = "0";
           slider.max = String(total);
           slider.value = String(count);
@@ -127,9 +101,28 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
             render();
           });
 
-          sliderWrapper.append(sliderLabel, slider);
+          bar.append(fill, slider);
 
-          column.append(stack, sliderWrapper);
+          const countEl = doc.createElement("span");
+          countEl.className = "candidate-stack-count";
+          countEl.dataset.countFor = candidate.id;
+          countEl.textContent = String(count);
+
+          const removeButton = doc.createElement("button");
+          removeButton.type = "button";
+          removeButton.dataset.action = "remove-candidate";
+          removeButton.dataset.candidateId = candidate.id;
+          removeButton.textContent = `Remove ${candidate.label}`;
+          removeButton.disabled =
+            state.candidates.length <= FREEPLAY_MIN_CANDIDATES;
+          removeButton.addEventListener("click", () => {
+            state = removeCandidate(state, candidate.id, total);
+            render();
+          });
+
+          stack.append(swatch, label, bar, countEl, removeButton);
+
+          column.append(stack);
           return column;
         }),
       );

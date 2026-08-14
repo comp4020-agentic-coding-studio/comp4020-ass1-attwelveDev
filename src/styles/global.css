@@ -243,19 +243,57 @@ button:disabled {
   font-weight: 600;
 }
 
-.vote-slider {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.5rem 0;
-}
-
-.vote-slider input[type="range"] {
+/*
+ * The stack itself is the control: this range input sits directly on top of
+ * .candidate-stack-bar (which is `position: relative`), fully transparent,
+ * so dragging or clicking anywhere on the coloured fill adjusts its count.
+ * It's still a real native <input type="range"> underneath -- keyboard
+ * operability, aria-valuetext announcements, and the focus ring below all
+ * come for free from that, not from anything hand-built here.
+ */
+.candidate-stack-slider {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   writing-mode: vertical-lr;
   direction: rtl;
-  width: 1.5rem;
-  height: 12rem;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.candidate-stack-slider::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+.candidate-stack-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 100%;
+  height: 0.5rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.candidate-stack-slider::-moz-range-track {
+  background: transparent;
+  border: none;
+}
+
+.candidate-stack-slider::-moz-range-thumb {
+  width: 100%;
+  height: 0.5rem;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.candidate-stack-slider:focus-visible {
+  outline: 2px solid #0b5fff;
+  outline-offset: 2px;
 }
 
 .candidate-stack button[data-action="remove-candidate"] {

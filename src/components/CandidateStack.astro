@@ -19,6 +19,15 @@ const { id, label, colour, shape } = Astro.props;
   <span class="candidate-stack-label">{label}</span>
   <div class="candidate-stack-bar">
     <div class="candidate-stack-fill" data-fill-for={id} style={`--swatch-colour: ${colour};`}></div>
+    <input
+      type="range"
+      class="candidate-stack-slider"
+      data-slider-for={id}
+      aria-label={label}
+      min="0"
+      max="1"
+      value="0"
+    />
   </div>
   <span class="candidate-stack-count" data-count-for={id}>0</span>
 </div>

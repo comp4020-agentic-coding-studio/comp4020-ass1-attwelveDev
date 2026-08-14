@@ -2,7 +2,6 @@
 import "../styles/global.css";
 import BallotPaper from "../components/BallotPaper.astro";
 import CandidateStack from "../components/CandidateStack.astro";
-import VoteSlider from "../components/VoteSlider.astro";
 import { scenarioExplore } from "../data/scenario-explore";
 import { scenarioSpoiler } from "../data/scenario-spoiler";
 import { strategicBallot } from "../data/sample-ballot-strategic";
@@ -48,8 +47,8 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
           <p>
             Every voter ranks the candidates in order, but under
             first-past-the-post only a voter's first preference is ever
-            counted. Try it yourself — move the sliders and watch who's
-            ahead.
+            counted. Try it yourself — drag a candidate's stack and watch
+            who's ahead.
           </p>
         </div>
         <div class="chapter-viz" id="explore-app">
@@ -64,7 +63,6 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
                     colour={candidate.colour}
                     shape={candidate.shape}
                   />
-                  <VoteSlider id={candidate.id} label={candidate.label} />
                 </div>
               ))
             }
@@ -79,9 +77,9 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
             Now here's one particular election. Aster and Birch are similar
             candidates who split a majority that would rather see either of
             them win over Cedar — so under first-past-the-post, Cedar takes
-            it on a minority of first preferences. Try the sliders: as long
-            as Aster and Birch are close together, Cedar keeps winning even
-            though most voters prefer someone else.
+            it on a minority of first preferences. Try dragging the stacks:
+            as long as Aster and Birch are close together, Cedar keeps
+            winning even though most voters prefer someone else.
           </p>
         </div>
         <div class="chapter-viz" id="spoiler-app">
@@ -96,7 +94,6 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
                     colour={candidate.colour}
                     shape={candidate.shape}
                   />
-                  <VoteSlider id={candidate.id} label={candidate.label} />
                 </div>
               ))
             }
@@ -214,8 +211,8 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
         <h2 id="freeplay-heading">Try it yourself, no script this time</h2>
         <p>
           Every example above was tuned to make a point. This one isn't — add
-          or remove candidates, drag the sliders however you like, and see
-          who first-past-the-post picks.
+          or remove candidates, drag any stack however you like, and see who
+          first-past-the-post picks.
         </p>
         <div id="freeplay-app">
           <div class="candidate-columns" data-freeplay-columns></div>
