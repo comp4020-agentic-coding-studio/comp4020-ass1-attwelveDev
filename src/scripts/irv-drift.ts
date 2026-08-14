@@ -104,7 +104,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   ): void {
     const containerRect = container!.getBoundingClientRect();
     const fromTarget = root.querySelector<HTMLElement>(
-      `[data-candidate="${eliminatedId}"]`,
+      `[data-fill-for="${eliminatedId}"]`,
     );
     const fromRect = fromTarget?.getBoundingClientRect();
     const from = {
@@ -119,7 +119,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
       if (!candidate) continue;
 
       const target = root.querySelector<HTMLElement>(
-        `[data-candidate="${id}"]`,
+        `[data-fill-for="${id}"]`,
       );
       const targetRect = target?.getBoundingClientRect();
       const to = {

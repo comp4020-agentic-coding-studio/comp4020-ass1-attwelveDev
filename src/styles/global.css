@@ -293,11 +293,22 @@ ul.ballot-paper-ranking {
   list-style: none;
 }
 
+ol.ballot-paper-ranking {
+  padding-left: 0;
+  list-style: none;
+  counter-reset: ballot-rank;
+}
+
 .ballot-paper-ranking li {
   display: flex;
   align-items: center;
   gap: 0.4rem;
   padding: 0.15rem 0;
+}
+
+ol.ballot-paper-ranking li::before {
+  counter-increment: ballot-rank;
+  content: counter(ballot-rank) ".";
 }
 
 .ballot-paper-checkbox {
