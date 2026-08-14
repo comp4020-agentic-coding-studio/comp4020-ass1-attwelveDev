@@ -29,9 +29,8 @@ function scenario(n: 2 | 3): Scenario {
 function setUp(n: 2 | 3) {
   const dom = new JSDOM(
     `<!doctype html><html><body><div id="freeplay-app">
-      <div data-freeplay-stacks></div>
+      <div data-freeplay-columns></div>
       <p data-testid="winner"></p>
-      <div data-freeplay-sliders></div>
       <button type="button" data-action="add-candidate">Add candidate</button>
     </div></body></html>`,
   );
@@ -75,6 +74,15 @@ describe("initFreeplayApp", () => {
     expect(
       root.querySelector('[data-testid="winner"]')!.textContent,
     ).toContain("A");
+  });
+
+  it("pairs each candidate's stack and slider inside one shared candidate-column", () => {
+    const { root } = setUp(3);
+    const stack = root.querySelector('[data-candidate="a"]')!;
+    const slider = root.querySelector('input[data-slider-for="a"]')!;
+    const column = stack.closest(".candidate-column");
+    expect(column).not.toBeNull();
+    expect(column!.contains(slider)).toBe(true);
   });
 
   it("adds a candidate on click, preserving the vote total", () => {
