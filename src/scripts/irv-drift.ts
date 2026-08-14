@@ -108,7 +108,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     fromStyle: EdgeStyle,
     toStyle: EdgeStyle,
   ): void {
-    if (typeof el.animate !== "function") {
+    if (reducedMotion || typeof el.animate !== "function") {
       el.style.transform = `translate(${to.x}px, ${to.y}px)`;
       el.style.width = `${to.width}px`;
       el.style.height = `${to.height}px`;
@@ -122,7 +122,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   }
 
   function fadeOutMark(mark: HTMLElement): void {
-    if (typeof mark.animate !== "function") {
+    if (reducedMotion || typeof mark.animate !== "function") {
       mark.style.opacity = "0";
       return;
     }
@@ -198,7 +198,6 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
 
   nextButton.addEventListener("click", () => {
     if (!controller.next()) return;
-    if (reducedMotion) return;
 
     const eliminated = controller.justEliminated;
     const transfers = controller.justTransfers;
