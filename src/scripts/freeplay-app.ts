@@ -44,6 +44,8 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
   }
 
   function render(): void {
+    const winner = currentWinner();
+
     if (columnsEl) {
       columnsEl.replaceChildren(
         ...state.candidates.map((candidate) => {
@@ -53,7 +55,10 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
           column.className = "candidate-column";
 
           const stack = doc.createElement("div");
-          stack.className = "candidate-stack";
+          stack.className =
+            candidate.id === winner
+              ? "candidate-stack is-leading"
+              : "candidate-stack";
           stack.dataset.candidate = candidate.id;
 
           const swatch = doc.createElement("span");
@@ -64,6 +69,11 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
           const label = doc.createElement("span");
           label.className = "candidate-stack-label";
           label.textContent = candidate.label;
+
+          const leaderBadge = doc.createElement("span");
+          leaderBadge.className = "candidate-stack-leader-badge";
+          leaderBadge.setAttribute("aria-hidden", "true");
+          leaderBadge.textContent = "Leading";
 
           const bar = doc.createElement("div");
           bar.className = "candidate-stack-bar";
@@ -120,7 +130,7 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
             render();
           });
 
-          stack.append(swatch, label, bar, countEl, removeButton);
+          stack.append(swatch, label, leaderBadge, bar, countEl, removeButton);
 
           column.append(stack);
           return column;
@@ -132,9 +142,7 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
       addButton.disabled = state.candidates.length >= FREEPLAY_MAX_CANDIDATES;
     }
 
-    const winnerCandidate = state.candidates.find(
-      (c) => c.id === currentWinner(),
-    );
+    const winnerCandidate = state.candidates.find((c) => c.id === winner);
     if (winnerEl && winnerCandidate) {
       winnerEl.textContent = `${winnerCandidate.label} is currently ahead.`;
     }

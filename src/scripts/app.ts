@@ -35,6 +35,12 @@ export function initApp(root: ParentNode, scenario: Scenario): void {
     if (id) fillEls.set(id, el);
   }
 
+  const stackEls = new Map<CandidateId, Element>();
+  for (const el of root.querySelectorAll("[data-candidate]")) {
+    const id = el.getAttribute("data-candidate");
+    if (id) stackEls.set(id, el);
+  }
+
   const winnerEl = root.querySelector('[data-testid="winner"]');
 
   // Only the first preference in each synthetic ranking is ever read by
@@ -80,7 +86,12 @@ export function initApp(root: ParentNode, scenario: Scenario): void {
       }
     }
 
-    const winnerCandidate = candidatesById.get(currentWinner());
+    const winner = currentWinner();
+    for (const [id, stackEl] of stackEls) {
+      stackEl.classList.toggle("is-leading", id === winner);
+    }
+
+    const winnerCandidate = candidatesById.get(winner);
     if (winnerEl && winnerCandidate) {
       winnerEl.textContent = `${winnerCandidate.label} is currently ahead.`;
     }

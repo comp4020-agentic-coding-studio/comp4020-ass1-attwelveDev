@@ -243,6 +243,29 @@ button:disabled {
   font-weight: 600;
 }
 
+.candidate-stack-leader-badge {
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #7a5b00;
+  text-transform: uppercase;
+  visibility: hidden;
+  background: #ffd447;
+  border-radius: 999px;
+}
+
+.candidate-stack.is-leading .candidate-stack-leader-badge {
+  visibility: visible;
+}
+
+.candidate-stack.is-leading .candidate-stack-bar {
+  border-color: #d19f00;
+  box-shadow: 0 0 0 3px #ffd447;
+  transition:
+    border-color 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+
 /*
  * The stack itself is the control: this range input sits directly on top of
  * .candidate-stack-bar (which is `position: relative`), fully transparent,
