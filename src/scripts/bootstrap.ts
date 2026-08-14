@@ -14,11 +14,13 @@ if (exploreRoot) {
   initBallotDrift(fptpIntroRoot, exploreRoot, scenarioExplore);
 }
 
-const spoilerChapterRoot = document.querySelector("#spoiler-chapter");
 const spoilerRoot = document.querySelector("#spoiler-app");
 if (spoilerRoot) {
   initApp(spoilerRoot, scenarioSpoiler);
-  initBallotDrift(spoilerChapterRoot, spoilerRoot, scenarioSpoiler);
+  // No hero here: the spoiler's point (a whole electorate splitting its
+  // vote) isn't something any single ballot illustrates, unlike the intro
+  // chapters' "how the ballot works" heroes.
+  initBallotDrift(null, spoilerRoot, scenarioSpoiler);
 }
 
 const irvIntroRoot = document.querySelector("#irv-ballot-intro");
