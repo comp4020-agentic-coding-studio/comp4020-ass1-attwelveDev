@@ -42,7 +42,12 @@ function immediateMajorityScenario(): Scenario {
 }
 
 function markup(ids: string[]): string {
-  const stacks = ids.map((id) => `<div data-candidate="${id}"></div>`).join("");
+  const stacks = ids
+    .map(
+      (id) =>
+        `<div data-candidate="${id}"><div data-fill-for="${id}"></div></div>`,
+    )
+    .join("");
   return `<section>${stacks}<div data-ballot-drift></div><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
 }
 
@@ -68,6 +73,22 @@ function clickPrev(root: ParentNode) {
   root
     .querySelector<HTMLButtonElement>('button[data-action="prev-round"]')!
     .click();
+}
+
+function rect(top: number, left: number): DOMRect {
+  return {
+    top,
+    left,
+    right: left,
+    bottom: top,
+    width: 0,
+    height: 0,
+    x: left,
+    y: top,
+    toJSON() {
+      return this;
+    },
+  };
 }
 
 describe("initIrvDrift", () => {
@@ -108,6 +129,33 @@ describe("initIrvDrift", () => {
 
     expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(0);
     expect(animateSpy).not.toHaveBeenCalled();
+  });
+
+  it("lands transfer chips on the receiving candidate's colour fill, not the whole stack", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
+    );
+    const { window } = dom;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    // No `animate` on this prototype -> flyTo's fallback branch runs,
+    // setting style.transform synchronously from the resolved rect, so the
+    // landing target is observable without touching WAAPI at all.
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0);
+    };
+    const root = window.document.querySelector("section")!;
+
+    initIrvDrift(root, threeCandidateScenario());
+    clickNext(root);
+
+    const chip = root.querySelector<HTMLElement>(
+      '[data-transfer-chip-for="a"]',
+    )!;
+    expect(chip.style.transform).toBe("translate(500px, 500px)");
   });
 
   it("does nothing when there's no ballot-drift container or next button", () => {

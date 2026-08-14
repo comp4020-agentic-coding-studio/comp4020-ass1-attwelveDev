@@ -35,15 +35,18 @@ function setUp(
   opts: { hero?: boolean; separateHeroSection?: boolean } = {},
 ) {
   const heroMarkup = opts.hero ? `<div data-hero-ballot="a"></div>` : "";
+  const stacks =
+    `<div data-candidate="a"><div data-fill-for="a"></div></div>` +
+    `<div data-candidate="b"><div data-fill-for="b"></div></div>`;
   const markup = opts.separateHeroSection
-    ? `<section>${heroMarkup}</section><section><div data-candidate="a"></div><div data-candidate="b"></div><div data-ballot-drift></div></section>`
-    : `<section>${heroMarkup}<div data-candidate="a"></div><div data-candidate="b"></div><div data-ballot-drift></div></section>`;
+    ? `<section>${heroMarkup}</section><section>${stacks}<div data-ballot-drift></div></section>`
+    : `<section>${heroMarkup}${stacks}<div data-ballot-drift></div></section>`;
   const dom = new JSDOM(`<!doctype html><html><body>${markup}</body></html>`, {
     url: "http://localhost/",
   });
   const { window } = dom;
   window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion });
-  const animateSpy = vi.fn();
+  const animateSpy = vi.fn().mockReturnValue({ finished: Promise.resolve() });
   window.HTMLElement.prototype.animate = animateSpy;
   const sections = window.document.querySelectorAll("section");
   const heroRoot = sections[0];
@@ -53,7 +56,72 @@ function setUp(
     targetRoot,
     animateSpy,
     calledOn: animateSpy.mock.contexts,
+    window,
   };
+}
+
+function rect(top: number, left: number): DOMRect {
+  return {
+    top,
+    left,
+    right: left,
+    bottom: top,
+    width: 0,
+    height: 0,
+    x: left,
+    y: top,
+    toJSON() {
+      return this;
+    },
+  };
+}
+
+// jsdom has no real IntersectionObserver at all, so exercising the hero's
+// bidirectional trigger (as opposed to the graceful-degradation "no
+// IntersectionObserver -> place immediately" path already covered above)
+// needs a fake one the test can fire on demand. The constructor captures its
+// callback and observed element so a test can call .trigger(el, bool) to
+// simulate a scroll checkpoint crossing.
+function fakeIntersectionObserver() {
+  const instances: FakeObserver[] = [];
+
+  class FakeObserver {
+    private readonly callback: IntersectionObserverCallback;
+    observed: Element[] = [];
+
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback;
+      instances.push(this);
+    }
+
+    observe(el: Element): void {
+      this.observed.push(el);
+    }
+
+    unobserve(): void {}
+    disconnect(): void {}
+
+    trigger(el: Element, isIntersecting: boolean): void {
+      this.callback(
+        [{ target: el, isIntersecting } as IntersectionObserverEntry],
+        this as unknown as IntersectionObserver,
+      );
+    }
+  }
+
+  return { FakeObserver, instances };
+}
+
+function observerFor(
+  instances: {
+    observed: Element[];
+    trigger(el: Element, isIntersecting: boolean): void;
+  }[],
+  el: Element,
+) {
+  const found = instances.find((observer) => observer.observed.includes(el));
+  if (!found) throw new Error("no observer was registered for that element");
+  return found;
 }
 
 describe("initBallotDrift", () => {
@@ -82,6 +150,24 @@ describe("initBallotDrift", () => {
       '[data-mini-ballot-for="a"]',
     )!;
     expect(chip.style.transform).toBe("translate(0px, 0px)");
+  });
+
+  it("lands chips on the candidate's colour fill, not the whole stack", () => {
+    const { heroRoot, targetRoot, window } = setUp(true);
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0);
+    };
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+
+    const chip = targetRoot.querySelector<HTMLElement>(
+      '[data-mini-ballot-for="a"]',
+    )!;
+    expect(chip.style.transform).toBe("translate(500px, 500px)");
   });
 
   it("does nothing when there's no ballot-drift container in the target root", () => {
@@ -143,5 +229,89 @@ describe("initBallotDrift", () => {
         (el as HTMLElement).hasAttribute("data-hero-ballot"),
       ),
     ).toBe(false);
+  });
+
+  it("flies a chip forward and fades the hero out when it scrolls out of view", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window, calledOn } = setUp(false, {
+      hero: true,
+    });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    observerFor(instances, hero).trigger(hero, false);
+
+    expect(calledOn.includes(hero)).toBe(true);
+    expect(
+      targetRoot.querySelector("[data-hero-ballot-chip]"),
+    ).not.toBeNull();
+  });
+
+  it("fades the hero back in and flies its chip home once it scrolls back into view", async () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window, animateSpy } = setUp(false, {
+      hero: true,
+    });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+    heroObserver.trigger(hero, false);
+    heroObserver.trigger(hero, true);
+
+    const heroFadeCalls = animateSpy.mock.contexts.filter(
+      (el) => el === hero,
+    ).length;
+    expect(heroFadeCalls).toBe(2);
+    await vi.waitFor(() => {
+      expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+    });
+  });
+
+  it("doesn't spawn a second hero chip when the same direction repeats", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false, { hero: true });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+    heroObserver.trigger(hero, false);
+    heroObserver.trigger(hero, false);
+
+    expect(
+      targetRoot.querySelectorAll("[data-hero-ballot-chip]").length,
+    ).toBe(1);
+  });
+
+  it("snaps the hero handoff instantly in both directions under reduced motion", async () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window, animateSpy } = setUp(true, {
+      hero: true,
+    });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+
+    heroObserver.trigger(hero, false);
+    expect(hero.style.opacity).toBe("0");
+    expect(
+      targetRoot.querySelector("[data-hero-ballot-chip]"),
+    ).not.toBeNull();
+
+    heroObserver.trigger(hero, true);
+    expect(hero.style.opacity).toBe("1");
+    expect(animateSpy).not.toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+    });
   });
 });
