@@ -1,14 +1,11 @@
 ---
 import "../styles/global.css";
+import BallotPaper from "../components/BallotPaper.astro";
 import CandidateStack from "../components/CandidateStack.astro";
 import VoteSlider from "../components/VoteSlider.astro";
 import { scenarioExplore } from "../data/scenario-explore";
 import { scenarioSpoiler } from "../data/scenario-spoiler";
 import { strategicBallot } from "../data/sample-ballot-strategic";
-
-const candidateLabels = new Map(
-  scenarioSpoiler.candidates.map((c) => [c.id, c.label]),
-);
 ---
 
 <!doctype html>
@@ -34,29 +31,31 @@ const candidateLabels = new Map(
             counted. Try it yourself — move the sliders and watch who's
             ahead.
           </p>
+          <BallotPaper
+            candidates={scenarioExplore.candidates}
+            ranking={scenarioExplore.groups[0].ranking}
+            variant="full"
+            hero
+          />
         </div>
         <div class="chapter-viz" id="explore-app">
           <h2 id="explore-heading">How first-past-the-post works</h2>
-          <div class="stacks" data-ballot-drift>
+          <div class="candidate-columns" data-ballot-drift>
             {
               scenarioExplore.candidates.map((candidate) => (
-                <CandidateStack
-                  id={candidate.id}
-                  label={candidate.label}
-                  colour={candidate.colour}
-                  shape={candidate.shape}
-                />
+                <div class="candidate-column">
+                  <CandidateStack
+                    id={candidate.id}
+                    label={candidate.label}
+                    colour={candidate.colour}
+                    shape={candidate.shape}
+                  />
+                  <VoteSlider id={candidate.id} label={candidate.label} />
+                </div>
               ))
             }
           </div>
           <p data-testid="winner" aria-live="polite"></p>
-          <div class="sliders">
-            {
-              scenarioExplore.candidates.map((candidate) => (
-                <VoteSlider id={candidate.id} label={candidate.label} />
-              ))
-            }
-          </div>
         </div>
       </section>
 
@@ -70,29 +69,31 @@ const candidateLabels = new Map(
             as Aster and Birch are close together, Cedar keeps winning even
             though most voters prefer someone else.
           </p>
+          <BallotPaper
+            candidates={scenarioSpoiler.candidates}
+            ranking={scenarioSpoiler.groups[0].ranking}
+            variant="full"
+            hero
+          />
         </div>
         <div class="chapter-viz" id="spoiler-app">
           <h2 id="spoiler-heading">Where first-past-the-post goes wrong</h2>
-          <div class="stacks" data-ballot-drift>
+          <div class="candidate-columns" data-ballot-drift>
             {
               scenarioSpoiler.candidates.map((candidate) => (
-                <CandidateStack
-                  id={candidate.id}
-                  label={candidate.label}
-                  colour={candidate.colour}
-                  shape={candidate.shape}
-                />
+                <div class="candidate-column">
+                  <CandidateStack
+                    id={candidate.id}
+                    label={candidate.label}
+                    colour={candidate.colour}
+                    shape={candidate.shape}
+                  />
+                  <VoteSlider id={candidate.id} label={candidate.label} />
+                </div>
               ))
             }
           </div>
           <p data-testid="winner" aria-live="polite"></p>
-          <div class="sliders">
-            {
-              scenarioSpoiler.candidates.map((candidate) => (
-                <VoteSlider id={candidate.id} label={candidate.label} />
-              ))
-            }
-          </div>
         </div>
       </section>
 
@@ -112,23 +113,19 @@ const candidateLabels = new Map(
           <div class="ballot-comparison">
             <div>
               <h3>Sincere vote</h3>
-              <ol>
-                {
-                  strategicBallot.sincereRanking.map((id) => (
-                    <li>{candidateLabels.get(id)}</li>
-                  ))
-                }
-              </ol>
+              <BallotPaper
+                candidates={scenarioSpoiler.candidates}
+                ranking={strategicBallot.sincereRanking}
+                variant="full"
+              />
             </div>
             <div>
               <h3>Tactical vote</h3>
-              <ol>
-                {
-                  strategicBallot.tacticalRanking.map((id) => (
-                    <li>{candidateLabels.get(id)}</li>
-                  ))
-                }
-              </ol>
+              <BallotPaper
+                candidates={scenarioSpoiler.candidates}
+                ranking={strategicBallot.tacticalRanking}
+                variant="full"
+              />
             </div>
           </div>
         </div>
@@ -157,18 +154,26 @@ const candidateLabels = new Map(
             eliminated and their ballots move to each voter's next choice.
             Step through the recount and watch who wins this time.
           </p>
+          <BallotPaper
+            candidates={scenarioSpoiler.candidates}
+            ranking={scenarioSpoiler.groups[0].ranking}
+            variant="full"
+            hero
+          />
         </div>
         <div class="chapter-viz" id="recount-app">
           <h2 id="recount-heading">Recounting the same election under IRV</h2>
-          <div class="stacks">
+          <div class="candidate-columns" data-ballot-drift>
             {
               scenarioSpoiler.candidates.map((candidate) => (
-                <CandidateStack
-                  id={candidate.id}
-                  label={candidate.label}
-                  colour={candidate.colour}
-                  shape={candidate.shape}
-                />
+                <div class="candidate-column">
+                  <CandidateStack
+                    id={candidate.id}
+                    label={candidate.label}
+                    colour={candidate.colour}
+                    shape={candidate.shape}
+                  />
+                </div>
               ))
             }
           </div>
@@ -189,9 +194,8 @@ const candidateLabels = new Map(
           who first-past-the-post picks.
         </p>
         <div id="freeplay-app">
-          <div class="stacks" data-freeplay-stacks></div>
+          <div class="candidate-columns" data-freeplay-columns></div>
           <p data-testid="winner" aria-live="polite"></p>
-          <div class="sliders" data-freeplay-sliders></div>
           <div class="freeplay-controls">
             <button type="button" data-action="add-candidate">
               Add candidate

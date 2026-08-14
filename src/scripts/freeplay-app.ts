@@ -18,14 +18,13 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
     counts: tallyFptp(scenario).counts,
   };
 
-  const stacksEl = root.querySelector("[data-freeplay-stacks]");
-  const slidersEl = root.querySelector("[data-freeplay-sliders]");
+  const columnsEl = root.querySelector("[data-freeplay-columns]");
   const winnerEl = root.querySelector('[data-testid="winner"]');
   const addButton = root.querySelector<HTMLButtonElement>(
     'button[data-action="add-candidate"]',
   );
 
-  const ownerDoc = (stacksEl ?? slidersEl ?? addButton)?.ownerDocument;
+  const ownerDoc = (columnsEl ?? addButton)?.ownerDocument;
   if (!ownerDoc) return;
   const doc: Document = ownerDoc;
 
@@ -45,9 +44,14 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
   }
 
   function render(): void {
-    if (stacksEl) {
-      stacksEl.replaceChildren(
+    if (columnsEl) {
+      columnsEl.replaceChildren(
         ...state.candidates.map((candidate) => {
+          const count = state.counts[candidate.id]!;
+
+          const column = doc.createElement("div");
+          column.className = "candidate-column";
+
           const stack = doc.createElement("div");
           stack.className = "candidate-stack";
           stack.dataset.candidate = candidate.id;
@@ -70,14 +74,14 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
           fill.style.setProperty("--swatch-colour", candidate.colour);
           fill.style.setProperty(
             "--fill-pct",
-            `${Math.round((state.counts[candidate.id]! / total) * 100)}%`,
+            `${Math.round((count / total) * 100)}%`,
           );
           bar.append(fill);
 
-          const count = doc.createElement("span");
-          count.className = "candidate-stack-count";
-          count.dataset.countFor = candidate.id;
-          count.textContent = String(state.counts[candidate.id]);
+          const countEl = doc.createElement("span");
+          countEl.className = "candidate-stack-count";
+          countEl.dataset.countFor = candidate.id;
+          countEl.textContent = String(count);
 
           const removeButton = doc.createElement("button");
           removeButton.type = "button";
@@ -91,23 +95,14 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
             render();
           });
 
-          stack.append(swatch, label, bar, count, removeButton);
-          return stack;
-        }),
-      );
-    }
+          stack.append(swatch, label, bar, countEl, removeButton);
 
-    if (slidersEl) {
-      slidersEl.replaceChildren(
-        ...state.candidates.map((candidate) => {
-          const count = state.counts[candidate.id]!;
+          const sliderWrapper = doc.createElement("label");
+          sliderWrapper.className = "vote-slider";
 
-          const wrapper = doc.createElement("label");
-          wrapper.className = "vote-slider";
-
-          const label = doc.createElement("span");
-          label.className = "vote-slider-label";
-          label.textContent = candidate.label;
+          const sliderLabel = doc.createElement("span");
+          sliderLabel.className = "vote-slider-label";
+          sliderLabel.textContent = candidate.label;
 
           const slider = doc.createElement("input");
           slider.type = "range";
@@ -132,8 +127,10 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
             render();
           });
 
-          wrapper.append(label, slider);
-          return wrapper;
+          sliderWrapper.append(sliderLabel, slider);
+
+          column.append(stack, sliderWrapper);
+          return column;
         }),
       );
     }
