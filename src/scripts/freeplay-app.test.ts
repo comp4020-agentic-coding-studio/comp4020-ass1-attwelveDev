@@ -98,6 +98,37 @@ describe("initFreeplayApp", () => {
     expect(slider.getAttribute("aria-label")).toBe("A");
   });
 
+  it("marks the currently-ahead candidate's stack as leading, and only that one", () => {
+    const { root } = setUp(3);
+    const winnerLabel = root.querySelector('[data-testid="winner"]')!
+      .textContent!;
+    const leadingStacks = root.querySelectorAll(".candidate-stack.is-leading");
+    expect(leadingStacks.length).toBe(1);
+    expect(winnerLabel).toContain(
+      leadingStacks[0].querySelector(".candidate-stack-label")!.textContent,
+    );
+  });
+
+  it("moves the leading indicator once a slider change flips who's ahead", () => {
+    const { dom, root } = setUp(3);
+    const sliderA = root.querySelector<HTMLInputElement>(
+      'input[data-slider-for="a"]',
+    )!;
+    sliderA.value = sliderA.max;
+    sliderA.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+    expect(
+      root
+        .querySelector('[data-candidate="a"]')!
+        .classList.contains("is-leading"),
+    ).toBe(true);
+    expect(
+      root
+        .querySelector('[data-candidate="b"]')!
+        .classList.contains("is-leading"),
+    ).toBe(false);
+  });
+
   it("adds a candidate on click, preserving the vote total", () => {
     const { dom, root } = setUp(3);
     const addButton = root.querySelector<HTMLButtonElement>(

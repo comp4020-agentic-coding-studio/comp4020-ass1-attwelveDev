@@ -10,16 +10,19 @@ import type { Scenario } from "../lib/types";
 // counts or winner banner.
 
 function section(candidateIds: string[]): string {
-  const sliders = candidateIds
-    .map((id) => `<input type="range" data-slider-for="${id}" />`)
+  const stacks = candidateIds
+    .map(
+      (id) =>
+        `<div class="candidate-stack" data-candidate="${id}">` +
+        `<div data-fill-for="${id}"></div>` +
+        `<input type="range" data-slider-for="${id}" />` +
+        `</div>`,
+    )
     .join("");
   const counts = candidateIds
     .map((id) => `<span data-count-for="${id}">0</span>`)
     .join("");
-  const fills = candidateIds
-    .map((id) => `<div data-fill-for="${id}"></div>`)
-    .join("");
-  return `<section>${sliders}${counts}${fills}<p data-testid="winner"></p></section>`;
+  return `<section>${stacks}${counts}<p data-testid="winner"></p></section>`;
 }
 
 function scenarioFor(ids: [string, string], counts: [number, number]): Scenario {
@@ -90,5 +93,49 @@ describe("initApp scoping", () => {
       root.querySelector<HTMLElement>('[data-fill-for="b"]')!.style
         .getPropertyValue("--fill-pct"),
     ).toBe("40%");
+  });
+
+  it("marks the currently-ahead candidate's stack as leading, and only that one", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${section(["a", "b"])}</body></html>`,
+    );
+    const root = dom.window.document.querySelector("section")!;
+    initApp(root, scenarioFor(["a", "b"], [60, 40]));
+
+    expect(
+      root.querySelector('[data-candidate="a"]')!.classList.contains(
+        "is-leading",
+      ),
+    ).toBe(true);
+    expect(
+      root.querySelector('[data-candidate="b"]')!.classList.contains(
+        "is-leading",
+      ),
+    ).toBe(false);
+  });
+
+  it("moves the leading indicator once a slider change flips who's ahead", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${section(["a", "b"])}</body></html>`,
+    );
+    const root = dom.window.document.querySelector("section")!;
+    initApp(root, scenarioFor(["a", "b"], [60, 40]));
+
+    const sliderB = root.querySelector<HTMLInputElement>(
+      'input[data-slider-for="b"]',
+    )!;
+    sliderB.value = sliderB.max;
+    sliderB.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+
+    expect(
+      root.querySelector('[data-candidate="a"]')!.classList.contains(
+        "is-leading",
+      ),
+    ).toBe(false);
+    expect(
+      root.querySelector('[data-candidate="b"]')!.classList.contains(
+        "is-leading",
+      ),
+    ).toBe(true);
   });
 });
