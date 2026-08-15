@@ -659,6 +659,127 @@ Checks:
   check), and that the conclusion sits directly before free play rather than
   free play remaining the de facto ending.
 
+## Feature: an editorial visual uplift — serif/sans type system, neutral chrome palette, consistent grid
+
+The site's visual language was the Vite starter's defaults (`system-ui`,
+`#1a1a1a` on white, a stray bright blue for links/focus, spacing that only
+`.chapter` sections got and the narrative-pass plain sections didn't). Per the
+user's request for a modern, professional, news-like design, `CLAUDE.md`
+gained a new "Design system" section documenting the concrete decisions
+before any implementation, then those decisions were applied to the site.
+
+- **Typography**: headings (`h1`/`h2`/`h3`) now use **Fraunces** (variable,
+  Google Fonts, `font-optical-sizing: auto`); everything else uses **IBM Plex
+  Sans**. Both were chosen for editorial character over a generic system
+  stack. Loaded via a Google Fonts `<link>` (preconnect + stylesheet,
+  `display=swap`) in `index.astro`'s `<head>`. Base body size bumped to
+  `1.125rem`/line-height 1.7.
+- **Colour**: `:root` tokens in `global.css` (`--colour-paper`,
+  `--colour-surface`, `--colour-ink`, `--colour-ink-muted`,
+  `--colour-hairline`, `--colour-accent`/`--colour-accent-hover`). The accent
+  is a deep, desaturated plum (~300° hue) chosen deliberately: candidate data
+  (`src/data/scenario-*.ts`) already occupies blue/orange/vermillion/green
+  (~20–200°, Okabe-Ito colour-blind-safe) and the leader badge already claims
+  gold (~45°) — plum is the one hue none of that data uses, so chrome (links,
+  focus rings, hover borders) can never be mistaken for a candidate's colour
+  or the "currently leading" indicator. Candidate colours and the leader
+  badge itself were deliberately left untouched — they're data-semantic, out
+  of scope for a chrome pass.
+- **Spacing & grid**: a `--space-*` scale, `--content-max-width` (72rem, up
+  from 64rem), `--prose-max-width` (~34rem), and one `--section-gap`
+  (`clamp(4rem, 10vw, 9rem)`) applied uniformly via `main > section` so every
+  top-level section — `.chapter`s and the plain intro/Duverger/conclusion/
+  free-play sections alike — gets the same generous whitespace, not just the
+  sections that happened to set their own margin before. `.chapter-prose`
+  changed from a symmetric `flex: 1 1 50%` to `flex: 0 1 var(--prose-max-
+  width)` (with `.chapter-viz` at `flex: 1 1 auto`), and the plain sections'
+  heading+paragraph are now capped to the same `--prose-max-width` — so the
+  reading column is narrower than the sticky visualisation everywhere, giving
+  the story a premium long-form feel next to its own evidence.
+- **Chrome**: the header is now a masthead (Fraunces nav link, bottom
+  hairline); buttons use the surface/hairline/ink tokens with an accent-
+  coloured hover border; every focus-visible state (buttons, links, the
+  candidate-stack sliders) uses the same accent outline instead of the old
+  stray blue; `.ballot-paper-heading` is now a small letter-spaced/uppercase
+  label rather than competing with real headings.
+
+Checks:
+- `src/styles/contrast.test.ts` (new) — computes real WCAG contrast ratios
+  for ink/paper, muted-ink/paper, and accent/paper and asserts they clear the
+  4.5:1 (normal text) / 3:1 (large text/UI) AA thresholds — turns "the
+  palette looks accessible" into a re-runnable check.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — the
+  stylelint pass caught real selector-ordering issues
+  (`no-descending-specificity`) in the rewritten `global.css`, fixed by
+  reordering rules rather than suppressing the rule.
+- Manual browser pass at both 1920×1080 and 390×844 (`pnpm preview`, via
+  `agent-browser`): fonts report `loaded` (not a stuck fallback) for every
+  weight in use; the prose column is visibly narrower than the sticky viz
+  column at desktop; section-to-section whitespace reads as generous and
+  consistent scrolling the whole page; the plum focus ring and leader-badge
+  gold are never confused with any candidate's colour at a glance (confirmed
+  against the blue/sky-blue/orange stacks in the spoiler and recount
+  sections); buttons and the recount/free-play controls keep a clearly
+  visible focus ring.
+
+## Feature: a manual pass over the visual uplift — cohesive candidates and one card style
+
+The uplift above shipped two cards that read as disjoint on a second look: the
+"How first-past-the-post works" section used one candidate roster (elm, fig,
+gum) while "The spoiler effect" and everything after it used a completely
+different one (aster, birch, cedar) — a real break from the Premise's own
+claim of "one hypothetical election, three candidates, carried through the
+whole piece." The two `.chapter-viz` card variants also disagreed on
+alignment (the ballot-intro hero cards centred, the candidate-tally cards
+left-aligned by default), and the left-aligned cards had no horizontal
+padding, so content sat flush against the card edge.
+
+- **One candidate roster, not two.** `src/data/candidates.ts` (new) is now the
+  single source of truth for the three candidates (aster/birch/cedar — kept,
+  since that's the name set the spoiler/strategic-voting/IRV prose already
+  refers to). `scenario-explore.ts` and `scenario-spoiler.ts` both import it
+  instead of each declaring their own `candidates` array; only their `groups`
+  (vote tallies) differ. The FPTP ballot-intro hero, "How first-past-the-post
+  works," "The spoiler effect," the strategic-voting comparison, the IRV
+  ballot-intro hero, and the IRV recount all now show the same three
+  candidates end to end — scrolling from one chapter to the next changes only
+  the tally, never who's on the ballot.
+- **One alignment style for `.chapter-viz`.** `.chapter-viz-intro` no longer
+  centres its content (`align-items`/`justify-content`/`text-align: center`
+  removed) — it keeps only the flex-column + gap needed to space its heading
+  above the hero ballot paper, matching the left-aligned reading direction
+  every other `.chapter-viz` card already used. Left-aligned was chosen over
+  centred because it matches the rest of the page's editorial layout (masthead,
+  prose, headings are all left-aligned) and reads naturally for a data chart
+  (`.candidate-columns`), which centring would not.
+- **Padding on the left-aligned cards.** `.chapter-viz` had `padding-block:
+  1rem` but no horizontal padding, so its content touched the card's left/
+  right edges. Added `padding-inline: 1.5rem` alongside it.
+- **Equal card widths.** At desktop, `.chapter-viz` was `flex: 1 1 auto` —
+  `auto` makes the flex-basis content-dependent, so a chapter with a longer
+  heading ("The spoiler effect: where first-past-the-post goes wrong") or
+  extra controls (the recount buttons) got a measurably wider card (690px/
+  606px) than the others (560px), even though every `.chapter` container was
+  the same width. Changed to `flex: 1 1 0` so the basis is always zero and
+  the full remaining width (container minus the prose column and gap) goes
+  to `.chapter-viz` via `flex-grow` — content-independent, so every sticky
+  viz card is now exactly the same width. Verified via `getBoundingClientRect`
+  on all five `.chapter-viz` cards: all report identical `left`/`width`.
+
+Checks:
+- `pnpm check` stays green (130 tests) — no test hardcodes the old
+  `elm`/`fig`/`gum` ids; `spec/assignment-1.test.ts` and
+  `scenario-spoiler.test.ts` both derive ids from the scenario objects rather
+  than asserting literal names, and `sample-ballot-strategic.ts`'s hardcoded
+  `aster`/`birch`/`cedar` rankings were left untouched since those ids didn't
+  change.
+- Manual browser pass at 1920×1080 and 390×844 (`pnpm preview`, via
+  `agent-browser`): confirmed the ballot-intro hero and the "How
+  first-past-the-post works"/"spoiler effect" cards now show identical
+  candidate swatches, shapes, and labels with only the vote counts differing;
+  confirmed both card variants read as one consistent left-aligned style with
+  visible padding on all sides at both viewport sizes.
+
 
 ## Data model
 

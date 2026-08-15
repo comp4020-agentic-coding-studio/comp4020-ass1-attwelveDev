@@ -1,48 +1,143 @@
+:root {
+  /* Typography */
+  --font-heading: "Fraunces", "Georgia", "Times New Roman", serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+
+  /* Colour: neutral editorial chrome, deliberately outside the candidate
+   * palette (blue/sky/orange/vermillion/green) and the leader-badge gold --
+   * see CLAUDE.md's "Design system" section for the full rationale. */
+  --colour-paper: #f7f4ee;
+  --colour-surface: #fffefb;
+  --colour-ink: #211d1a;
+  --colour-ink-muted: #5b564d;
+  --colour-hairline: #dedad1;
+  --colour-accent: #5b3a56;
+  --colour-accent-hover: #7a5474;
+
+  /* Spacing scale */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2.5rem;
+  --space-xl: 4rem;
+  --space-2xl: 6rem;
+
+  /* Grid */
+  --content-max-width: 72rem;
+  --prose-max-width: 34rem;
+  --section-gap: clamp(4rem, 10vw, 9rem);
+}
+
 body {
   margin: 0;
-  padding: 2rem;
-  font-family: system-ui, sans-serif;
-  line-height: 1.6;
-  color: #1a1a1a;
+  font-family: var(--font-body);
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: var(--colour-ink);
+  background: var(--colour-paper);
 }
 
 main {
   max-width: 40rem;
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+  padding-block: var(--space-xl);
   margin: 0 auto;
 }
 
 a {
-  color: #0b5fff;
+  color: var(--colour-accent);
+}
+
+header {
+  padding-inline: clamp(1.25rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--colour-hairline);
 }
 
 header nav a {
   display: inline-block;
   padding-block: 0.75rem;
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--colour-ink);
+  text-decoration: none;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--colour-accent);
+  outline-offset: 2px;
+}
+
+a:hover {
+  color: var(--colour-accent-hover);
+}
+
+header nav a:hover {
+  color: var(--colour-accent);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  color: var(--colour-ink);
+}
+
+h1 {
+  font-size: clamp(2.25rem, 4vw + 1rem, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin-block: 0 var(--space-xl);
+}
+
+h2 {
+  font-size: clamp(1.5rem, 2.5vw + 1rem, 2rem);
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 500;
 }
 
 button {
   min-height: 2.75rem;
   padding: 0.5rem 1rem;
   font: inherit;
+  font-family: var(--font-body);
   font-size: 1rem;
-  color: #1a1a1a;
-  background: #f0f0f0;
-  border: 1px solid #b3b3b3;
+  font-weight: 500;
+  color: var(--colour-ink);
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-hairline);
   border-radius: 0.25rem;
   cursor: pointer;
 }
 
 button:disabled {
-  color: #595959;
-  background: #e5e5e5;
+  color: var(--colour-ink-muted);
+  background: var(--colour-hairline);
   cursor: not-allowed;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--colour-accent);
+  outline-offset: 2px;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--colour-accent);
 }
 
 .chapter {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  margin-block: 6rem;
 }
 
 .chapter-viz {
@@ -54,21 +149,43 @@ button:disabled {
   max-height: 40vh;
   overflow-y: auto;
   padding-block: 1rem;
-  background: #fff;
-  border-bottom: 1px solid #e5e5e5;
+  padding-inline: 1.5rem;
+  background: var(--colour-surface);
+  border-bottom: 1px solid var(--colour-hairline);
 }
 
 .chapter-viz h2 {
   margin-top: 0;
 }
 
+main > section {
+  margin-block: var(--section-gap);
+}
+
+main > section:first-of-type {
+  margin-top: 0;
+}
+
+main > section:last-of-type {
+  margin-bottom: 0;
+}
+
+main > section:not(.chapter) > h2,
+main > section:not(.chapter) > p {
+  max-width: var(--prose-max-width);
+}
+
+/*
+ * Same left-aligned reading direction as every other .chapter-viz card (the
+ * candidate-tally charts) -- this variant only adds the flex column + gap
+ * needed to space the heading above the hero ballot paper, not a different
+ * alignment style. Centering the ballot-intro cards while the tally cards
+ * stayed left-aligned read as two different card styles side by side.
+ */
 .chapter-viz-intro {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 1rem;
-  text-align: center;
 }
 
 .chapter-prose {
@@ -80,7 +197,7 @@ button:disabled {
 
 @media (width >= 900px) {
   main {
-    max-width: 64rem;
+    max-width: var(--content-max-width);
   }
 
   .chapter {
@@ -91,14 +208,14 @@ button:disabled {
 
   .chapter-prose {
     order: 1;
-    flex: 1 1 50%;
+    flex: 0 1 var(--prose-max-width);
     min-width: 0;
     min-height: 70vh;
   }
 
   .chapter-viz {
     order: 2;
-    flex: 1 1 50%;
+    flex: 1 1 0;
     min-width: 0;
     top: 10vh;
     min-height: 0;
@@ -150,8 +267,8 @@ button:disabled {
   position: relative;
   width: 2.5rem;
   height: 12rem;
-  background: #f0f0f0;
-  border: 1px solid #b3b3b3;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-hairline);
 }
 
 .candidate-stack-fill {
@@ -317,7 +434,7 @@ button:disabled {
 }
 
 .candidate-stack-slider:focus-visible {
-  outline: 2px solid #0b5fff;
+  outline: 2px solid var(--colour-accent);
   outline-offset: 2px;
 }
 
@@ -333,17 +450,22 @@ button:disabled {
   width: 12rem;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
-  background: #fff;
-  border: 1px solid #999;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-hairline);
   border-radius: 0.25rem;
 }
 
 .ballot-paper-heading {
   padding-bottom: 0.25rem;
   margin: 0 0 0.5rem;
-  font-weight: 600;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
   text-align: center;
-  border-bottom: 1px solid #ccc;
+  text-transform: uppercase;
+  color: var(--colour-ink-muted);
+  border-bottom: 1px solid var(--colour-hairline);
 }
 
 .ballot-paper-ranking {
@@ -380,8 +502,8 @@ ol.ballot-paper-ranking li::before {
   flex-shrink: 0;
   width: 0.9rem;
   height: 0.9rem;
-  background: #fff;
-  border: 1px solid #666;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-ink-muted);
   border-radius: 0.15rem;
 }
 
@@ -393,7 +515,7 @@ ol.ballot-paper-ranking li::before {
   font-size: 0.75rem;
   font-weight: 700;
   line-height: 1;
-  color: #1a1a1a;
+  color: var(--colour-ink);
 }
 
 .ballot-paper-mini {
@@ -403,8 +525,8 @@ ol.ballot-paper-ranking li::before {
   display: inline-block;
   width: 0.9rem;
   height: 1.2rem;
-  background: #fff;
-  border: 1px solid #999;
+  background: var(--colour-surface);
+  border: 1px solid var(--colour-hairline);
   border-radius: 0.15rem;
   pointer-events: none;
 }

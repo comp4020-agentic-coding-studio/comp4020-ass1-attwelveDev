@@ -44,6 +44,132 @@ and see `spec/README.md` for how the checks in this repo relate to it.
   disagrees with what's written, the file is wrong, not the code.
 - Commit when the checks pass. Never commit a red state.
 
+## The site is one story, not two feature demos
+
+This piece has one job: walk a reader with no background in voting systems or
+politics from "here's a simple election" to "here's why the rules you count
+it under can change who wins" and out the other side understanding both the
+flaw and the fix. That's a narrative arc, not a pair of interactive demos
+stapled together — hold every section to that bar, not just to "does the
+mechanic work."
+
+- **Assume nothing.** The reader may not know what "preferential voting,"
+  "spoiler effect," "IRV," or "Duverger's law" mean, and may never have
+  thought about how counting rules can change an election's outcome at all
+  — the one thing they can be assumed to know is what a ballot paper looks
+  like. Define a term in plain language the first time it's used, in the
+  flow of the story, not as a glossary aside. If a sentence only lands for
+  someone who's already taken a politics class, rewrite it.
+- **Open with the stakes, not the mechanic.** The introduction's job is to
+  give the reader a reason to keep scrolling before it teaches them
+  anything — why would the way votes get counted matter to *them*? Lead
+  with that motivation, then bring in the ballot paper and the election.
+- **Close the loop.** The ending needs a real conclusion — key takeaways
+  stated plainly and tied back to the question the introduction opened
+  with — not just a "free play, have fun" hand-off with no summary. Free
+  play is a bonus after the story lands its point, not a substitute for
+  landing it.
+- **One election, one throughline, carried on purpose.** `PLAN.md`'s
+  Premise section already establishes the mechanism: the same hypothetical
+  election is recounted, not replaced, when the story moves from FPTP to
+  IRV. Protect that when adding or changing sections — a new mechanic that
+  doesn't refer back to the same scenario breaks the "second look at the
+  same election" logic the whole piece depends on.
+- **The FPTP → IRV transition is a hinge, not a scene break.** The reader
+  should never feel like they've closed one explainer and opened another.
+  The transition needs to say what's about to happen and why — *we just
+  saw this go wrong under FPTP; here's the same votes, counted a different
+  way* — before the mechanic changes under them. FPTP lives in
+  `app.ts`/`ballot-drift.ts` and IRV in `irv-app.ts`/`irv-drift.ts` as
+  separate implementations for good engineering reasons, but that split
+  must never be visible to the reader as a change in voice, tone, or
+  assumed knowledge.
+- **Read it cold before calling a section done.** The narrative equivalent
+  of animation's "not green until watched": read new or changed copy start
+  to finish as if you were a first-time reader with no context, out loud if
+  that helps catch stumbles. If you have to reread a sentence to parse it,
+  or a section doesn't make clear why it follows the one before it, that's
+  a bug in the story, not a matter of taste.
+
+## Design system: editorial, not generic
+
+The visual language is a deliberate news/long-form-journalism system, not the
+starter template's system-ui defaults. It exists to make the page read as a
+piece of considered journalism about a real mechanism, not a form with some
+widgets on it — so hold new markup and CSS to this, not just "does it work."
+
+- **Serif headlines, sans body, on purpose.** `h1`/`h2`/`h3` use **Fraunces**
+  (variable, Google Fonts; weight 600 for `h1`/`h2`, 500–600 for `h3`,
+  `font-optical-sizing: auto` so its characterful low-opsz shapes show at
+  display sizes; fallback `Fraunces, Georgia, "Times New Roman", serif`).
+  Everything else — body copy, buttons, nav, labels, candidate names, vote
+  counts — uses **IBM Plex Sans** (400 body, 500 for buttons/labels/UI
+  emphasis; fallback `"IBM Plex Sans", system-ui, sans-serif`). Both were
+  chosen for character over a generic system stack; don't reach for
+  system-ui/Arial/Helvetica for new elements. Loaded via Google Fonts
+  `<link>` (preconnect + stylesheet, `display=swap`, only the weights in use)
+  — `swap` plus the serif/sans fallback stacks mean text is never invisible
+  waiting on the font request. Base body size is `1.125rem`/line-height 1.7
+  for premium long-form reading; buttons keep an explicit `1rem` so controls
+  don't inherit the larger reading size.
+- **Palette is neutral chrome, not another candidate colour.** Tokens live in
+  `:root` in `global.css`: `--colour-paper` (warm ivory page background),
+  `--colour-surface` (slightly lifted panels — ballot paper, sticky viz,
+  buttons), `--colour-ink` (primary text), `--colour-ink-muted` (secondary/
+  meta text), `--colour-hairline` (borders/dividers), `--colour-accent` /
+  `--colour-accent-hover` (a deep, desaturated plum, ~300° hue). The plum is
+  a deliberate choice, not a default: candidate data (`src/data/scenario-
+  *.ts`) already occupies blue ~200°, orange/vermillion ~20–40°, and green
+  ~160° (an Okabe-Ito colour-blind-safe set), and the leader badge already
+  claims gold ~45° — plum is the one hue none of that data uses, dark and
+  desaturated enough to read as structural chrome rather than a vote.
+  **Never** reuse a candidate hue or the leader-badge gold for chrome, and
+  never give the accent colour a fill large enough to be mistaken for a
+  candidate's stack or swatch — links, focus rings, and hover borders only.
+  Candidate colours and the leader-badge gold are data-semantic and out of
+  scope for styling passes like this one.
+- **Generous, uniform whitespace is a layout rule, not a per-section
+  choice.** Every top-level section under `main` — `.chapter`s and the plain
+  intro/Duverger/conclusion/free-play sections alike — shares one spacing
+  rule (`--section-gap: clamp(4rem, 10vw, 9rem)` via `main > section`), not
+  a value some sections happen to set and others forget. A reader should be
+  able to feel one section end and the next begin before any new content
+  starts, every time, not just where a `.chapter` wrapper happened to add
+  margin.
+- **The reading column is narrower than the sticky visualisation on
+  purpose.** `--prose-max-width` (~34rem, roughly 60–65 characters at the
+  new body size) caps prose text — both `.chapter-prose` and the plain
+  sections' heading+paragraph — while `.chapter-viz` and the free-play
+  widget are allowed the remaining width. That asymmetry (narrow story,
+  wide data) is what makes the page read as premium long-form storytelling
+  next to its own evidence, rather than two equal-width columns. Keep it
+  when adding sections: a new chapter's prose shouldn't stretch to match its
+  viz.
+- **One grid, everywhere.** `--content-max-width` (72rem desktop cap) and a
+  fluid horizontal padding (`clamp(1.25rem, 4vw, 3rem)`) on `main` are the
+  only things that should ever set the page's outer margins — don't
+  hand-roll a one-off max-width or padding on a new section. Consistency of
+  the outer grid is what makes the whole page feel like one document instead
+  of a sequence of separately-styled demos.
+- **Out of scope, on purpose.** No dark mode / `prefers-color-scheme`
+  support, and no new section-kicker copy (e.g. "Part one" labels) — this is
+  a chrome/typography/spacing system, not a new content pass. If either
+  becomes worth doing, it's a separate decision, not an accidental side
+  effect of touching `global.css`.
+
+**Checks**: `pnpm check` must stay green after any styling change.
+`src/styles/contrast.test.ts` computes real WCAG contrast ratios for the
+token pairs that carry text (ink/paper, muted-ink/paper, accent/paper) and
+asserts they clear 4.5:1 (normal text) / 3:1 (large text, UI) — a palette
+change that fails it is a real accessibility regression, not a nitpick. And,
+same rule as animation: a passing test proves the numbers are right, not
+that it looks right — before calling a styling change done, look at it in
+`pnpm preview` at both marking viewports (1920×1080, 390×844) and confirm
+fonts render cleanly, the narrow-prose/wide-viz asymmetry is visible at
+desktop, section whitespace feels consistent scrolling top to bottom, chrome
+colours are never confused with candidate colours, and every interactive
+element still shows a clear focus ring and stays keyboard-operable.
+
 ## Animation is a first-class feature, not garnish
 
 Animation is one of the things meant to make this prototype stand out, and

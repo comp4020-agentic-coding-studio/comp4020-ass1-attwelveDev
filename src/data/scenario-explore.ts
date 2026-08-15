@@ -1,23 +1,21 @@
 import type { Scenario } from "../lib/types";
+import { candidates } from "./candidates";
 
-// The freely-explorable default for the opening section: three hypothetical
-// candidates, no scripted outcome. One ballot group per candidate — since
-// this section only ever displays first-preference (FPTP) counts, the later
-// preferences are placeholders (fixed id order) rather than authored content;
-// only the group headed by each candidate is ever touched by the sliders.
+// The freely-explorable default for the opening section: the same three
+// candidates carried through the whole piece (see ./candidates.ts), no
+// scripted outcome yet. One ballot group per candidate — since this section
+// only ever displays first-preference (FPTP) counts, the later preferences
+// are placeholders (fixed id order) rather than authored content; only the
+// group headed by each candidate is ever touched by the sliders.
 //
-// Deliberately not tied — with fig (320) ahead of elm (280) and gum (300),
-// nudging elm's slider up is enough to flip the plurality winner, which is
-// the whole point of a section built around "try it yourself."
+// Deliberately not tied — with birch (320) ahead of aster (280) and cedar
+// (300), nudging aster's slider up is enough to flip the plurality winner,
+// which is the whole point of a section built around "try it yourself."
 export const scenarioExplore: Scenario = {
-  candidates: [
-    { id: "elm", label: "Elm", colour: "#0072B2", shape: "circle" },
-    { id: "fig", label: "Fig", colour: "#E69F00", shape: "square" },
-    { id: "gum", label: "Gum", colour: "#009E73", shape: "triangle" },
-  ],
+  candidates,
   groups: [
-    { ranking: ["elm", "fig", "gum"], count: 280 },
-    { ranking: ["fig", "elm", "gum"], count: 320 },
-    { ranking: ["gum", "fig", "elm"], count: 300 },
+    { ranking: ["aster", "birch", "cedar"], count: 280 },
+    { ranking: ["birch", "aster", "cedar"], count: 320 },
+    { ranking: ["cedar", "birch", "aster"], count: 300 },
   ],
 };
