@@ -740,4 +740,38 @@ describe("initBallotDrift", () => {
       targetRoot.querySelectorAll(".ballot-paper-mini").length,
     ).toBeGreaterThan(0);
   });
+
+  // The IRV recount section has no sliders -- its counts change from the
+  // next/prev round buttons instead -- so without its own trigger the
+  // swarm's landed chips would sit frozen at their round-1 landing height
+  // forever, including past the point where the candidate they were drawn
+  // for gets eliminated and its live fill collapses out from under them.
+  it("fades and removes the swarm's landed chips once a next/prev round button is clicked", async () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body><section>` +
+        `<div data-candidate="a"><div data-fill-for="a"></div></div>` +
+        `<div data-candidate="b"><div data-fill-for="b"></div></div>` +
+        `<div data-ballot-drift></div>` +
+        `<button data-action="next-round">Next</button>` +
+        `<button data-action="prev-round">Prev</button>` +
+        `</section></body></html>`,
+      { url: "http://localhost/" },
+    );
+    const { window } = dom;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    const root = window.document.querySelector("section")!;
+    initBallotDrift(root, root, scenario());
+
+    expect(
+      root.querySelectorAll(".ballot-paper-mini").length,
+    ).toBeGreaterThan(0);
+
+    root
+      .querySelector<HTMLButtonElement>('[data-action="next-round"]')!
+      .click();
+
+    await vi.waitFor(() => {
+      expect(root.querySelectorAll(".ballot-paper-mini").length).toBe(0);
+    });
+  });
 });

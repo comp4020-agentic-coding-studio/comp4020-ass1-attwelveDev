@@ -27,13 +27,13 @@ const scenario: Scenario = {
 };
 
 function markup(ids: string[]): string {
-  const counts = ids
-    .map((id) => `<span data-count-for="${id}">0</span>`)
+  const stacks = ids
+    .map(
+      (id) =>
+        `<div data-candidate="${id}"><span data-count-for="${id}">0</span><div data-fill-for="${id}"></div><span class="candidate-stack-leader-badge"></span></div>`,
+    )
     .join("");
-  const fills = ids
-    .map((id) => `<div data-fill-for="${id}"></div>`)
-    .join("");
-  return `<section>${counts}${fills}<p data-testid="winner"></p><p data-testid="round-status"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
+  return `<section>${stacks}<p data-testid="round-status"></p><p data-testid="winner"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
 }
 
 function setUp(reducedMotion = false) {
@@ -151,5 +151,98 @@ describe("initIrvApp", () => {
     expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
       "",
     );
+  });
+
+  it("highlights round 1's leading candidate with is-leading and a Leading badge", () => {
+    const root = setUp();
+
+    const leaderStack = root.querySelector('[data-candidate="a"]')!;
+    expect(leaderStack.classList.contains("is-leading")).toBe(true);
+    expect(leaderStack.classList.contains("is-winner")).toBe(false);
+    expect(
+      leaderStack.querySelector(".candidate-stack-leader-badge")!
+        .textContent,
+    ).toBe("Leading");
+
+    for (const id of ["b", "c"]) {
+      expect(
+        root.querySelector(`[data-candidate="${id}"]`)!.classList.contains(
+          "is-leading",
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it("switches to is-winner with a Winner badge at the final round, clearing is-leading everywhere", () => {
+    const root = setUp();
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .click();
+
+    const winnerStack = root.querySelector('[data-candidate="a"]')!;
+    expect(winnerStack.classList.contains("is-winner")).toBe(true);
+    expect(winnerStack.classList.contains("is-leading")).toBe(false);
+    expect(
+      winnerStack.querySelector(".candidate-stack-leader-badge")!
+        .textContent,
+    ).toBe("Winner");
+
+    for (const id of ["a", "b", "c"]) {
+      expect(
+        root.querySelector(`[data-candidate="${id}"]`)!.classList.contains(
+          "is-leading",
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it("names round 1's leading candidate in the round-status text", () => {
+    const root = setUp();
+
+    expect(
+      root.querySelector('[data-testid="round-status"]')!.textContent,
+    ).toBe("Round 1: A is leading.");
+  });
+
+  it("puts the elimination before the winner announcement in reading order", () => {
+    const root = setUp();
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .click();
+
+    expect(
+      root.querySelector('[data-testid="round-status"]')!.textContent,
+    ).toBe("Round 2: C is eliminated.");
+    expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
+      "A wins after the recount.",
+    );
+
+    const testids = [...root.querySelectorAll("[data-testid]")].map((el) =>
+      el.getAttribute("data-testid"),
+    );
+    expect(testids.indexOf("round-status")).toBeLessThan(
+      testids.indexOf("winner"),
+    );
+  });
+
+  it("restores is-leading after stepping back to round 1, clearing is-winner", () => {
+    const root = setUp();
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .click();
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="prev-round"]')!
+      .click();
+
+    const leaderStack = root.querySelector('[data-candidate="a"]')!;
+    expect(leaderStack.classList.contains("is-leading")).toBe(true);
+    expect(leaderStack.classList.contains("is-winner")).toBe(false);
+    expect(
+      leaderStack.querySelector(".candidate-stack-leader-badge")!
+        .textContent,
+    ).toBe("Leading");
   });
 });

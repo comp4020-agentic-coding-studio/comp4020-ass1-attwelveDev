@@ -3,6 +3,7 @@ import { scenarioFreeplay } from "../data/scenario-freeplay";
 import { scenarioSpoiler } from "../data/scenario-spoiler";
 import { initApp } from "./app";
 import { initBallotDrift } from "./ballot-drift";
+import { initBallotMarks } from "./ballot-marks";
 import { initFreeplayApp } from "./freeplay-app";
 import { initIrvApp } from "./irv-app";
 import { initIrvDrift } from "./irv-drift";
@@ -33,3 +34,5 @@ if (recountRoot) {
 
 const freeplayRoot = document.querySelector("#freeplay-app");
 if (freeplayRoot) initFreeplayApp(freeplayRoot, scenarioFreeplay);
+
+initBallotMarks(document);

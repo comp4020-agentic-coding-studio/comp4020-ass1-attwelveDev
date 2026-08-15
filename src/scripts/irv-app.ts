@@ -1,4 +1,5 @@
 import { createIrvController } from "../lib/irv-controller";
+import { tallyFptp } from "../lib/tally-fptp";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
 
 // DOM wiring for the IRV recount section. Reuses the explore/spoiler
@@ -21,6 +22,31 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
   for (const el of root.querySelectorAll<HTMLElement>("[data-fill-for]")) {
     const id = el.getAttribute("data-fill-for");
     if (id) fillEls.set(id, el);
+  }
+
+  const stackEls = new Map<CandidateId, HTMLElement>();
+  for (const el of root.querySelectorAll<HTMLElement>("[data-candidate]")) {
+    const id = el.getAttribute("data-candidate");
+    if (id) stackEls.set(id, el);
+  }
+
+  // Round 1's leader (highest count so far, before any elimination) isn't
+  // necessarily who the recount ends up crowning -- that gap is the whole
+  // point of this section -- so it's computed the same way the FPTP
+  // explore/spoiler sections compute theirs (app.ts's currentWinner()): a
+  // synthetic single-preference tally over whichever candidates are still
+  // active this round, reusing tallyFptp's tie-break rather than
+  // duplicating it.
+  function currentLeader(counts: Record<CandidateId, number>): CandidateId {
+    const ids = Object.keys(counts);
+    const synthetic: Scenario = {
+      candidates: ids.map((id) => candidatesById.get(id)!),
+      groups: ids.map((id) => ({
+        ranking: [id, ...ids.filter((other) => other !== id)],
+        count: counts[id],
+      })),
+    };
+    return tallyFptp(synthetic).winner;
   }
 
   const view = fillEls.values().next().value?.ownerDocument.defaultView;
@@ -65,20 +91,24 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
       );
     }
 
+    const winner = controller.winner;
+    const leader = winner ? null : currentLeader(round.counts);
+
     if (statusEl) {
       const roundNumber = controller.roundIndex + 1;
       const eliminatedCandidate = controller.justEliminated
         ? candidatesById.get(controller.justEliminated)
         : null;
+      const leaderCandidate = leader ? candidatesById.get(leader) : null;
       statusEl.textContent = eliminatedCandidate
         ? `Round ${roundNumber}: ${eliminatedCandidate.label} is eliminated.`
-        : `Round ${roundNumber}.`;
+        : leaderCandidate
+          ? `Round ${roundNumber}: ${leaderCandidate.label} is leading.`
+          : `Round ${roundNumber}.`;
     }
 
     if (winnerEl) {
-      const winnerCandidate = controller.winner
-        ? candidatesById.get(controller.winner)
-        : null;
+      const winnerCandidate = winner ? candidatesById.get(winner) : null;
       winnerEl.textContent = winnerCandidate
         ? `${winnerCandidate.label} wins after the recount.`
         : "";
@@ -86,6 +116,19 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
 
     if (nextButton) nextButton.disabled = controller.isFinal;
     if (prevButton) prevButton.disabled = controller.roundIndex === 0;
+
+    for (const [id, stackEl] of stackEls) {
+      const isWinner = id === winner;
+      const isLeading = id === leader;
+      stackEl.classList.toggle("is-winner", isWinner);
+      stackEl.classList.toggle("is-leading", isLeading);
+      const badge = stackEl.querySelector<HTMLElement>(
+        ".candidate-stack-leader-badge",
+      );
+      if (badge && (isWinner || isLeading)) {
+        badge.textContent = isWinner ? "Winner" : "Leading";
+      }
+    }
   }
 
   nextButton?.addEventListener("click", () => {

@@ -25,6 +25,18 @@ interface EdgeStyle {
   borderRadius: string;
 }
 
+// A chip currently landed at a receiving candidate's stack, tracked so a
+// later "Previous round" click can fly it back to where it came from instead
+// of leaving it stranded, and so a later "Next round" click knows the slate
+// is clear before spawning a fresh batch.
+interface LiveChip {
+  el: HTMLElement;
+  receivedBy: CandidateId;
+  naturalWidth: number;
+  naturalHeight: number;
+  landFraction: number;
+}
+
 // Largest-remainder allocation of a fixed number of visual chips across an
 // eliminated candidate's transfer counts, proportional to how many ballots
 // actually moved to each receiving candidate. Mirrors sampleAllocation's
@@ -114,6 +126,9 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   const nextButton = root.querySelector<HTMLButtonElement>(
     'button[data-action="next-round"]',
   );
+  const prevButton = root.querySelector<HTMLButtonElement>(
+    'button[data-action="prev-round"]',
+  );
   if (!container || !nextButton) return;
 
   const doc = container.ownerDocument;
@@ -127,6 +142,13 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   const reducedMotion =
     typeof view.matchMedia === "function" &&
     view.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // The chips currently landed from the most recent forward transfer, and
+  // who they flew from -- cleared by reverseTransferChips() once a
+  // "Previous round" click sends them back, so an unlimited number of
+  // next/prev cycles each start from a clean slate rather than piling up.
+  let liveChips: LiveChip[] = [];
+  let liveEliminated: CandidateId | null = null;
 
   function createMiniBallot(candidate: Candidate): HTMLElement {
     const chip = doc.createElement("span");
@@ -156,21 +178,30 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     toStyle: EdgeStyle,
     delayMs: number,
     durationMs: number,
-  ): void {
+  ): Animation | undefined {
     if (reducedMotion || typeof el.animate !== "function") {
       el.style.transform = `translate(${to.x}px, ${to.y}px)`;
       el.style.width = `${to.width}px`;
       el.style.height = `${to.height}px`;
       applyEdgeStyle(el, toStyle);
-      return;
+      return undefined;
     }
     const frames = springBoxKeyframes(from, to, { stiffness: 170, damping: 20 });
     frames[0] = { ...frames[0], ...fromStyle };
     frames[frames.length - 1] = { ...frames[frames.length - 1], ...toStyle };
-    el.animate(frames, {
+    // "both", not "forwards": a staggered chip's animate() call can carry a
+    // real delay before its own flight starts (later chips in a batch land
+    // later), and fill:"forwards" only ever backfills the *last* frame once
+    // an animation ends -- during the delay itself it applies nothing, so
+    // the freshly-appended chip would render at its raw stylesheet position
+    // (.ballot-paper-mini's position: absolute; top: 0; left: 0, i.e.
+    // container's top-left corner) until its delay elapses. "both" also
+    // holds the first frame's styles for the entire delay window, so a
+    // delayed chip sits at its real fromBox from the instant it's appended.
+    return el.animate(frames, {
       duration: durationMs,
       delay: delayMs,
-      fill: "forwards",
+      fill: "both",
     });
   }
 
@@ -190,9 +221,13 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   }
 
   function spawnTransferChips(
+    eliminated: CandidateId,
     transfers: Record<CandidateId, number>,
     fromRect: DOMRect | undefined,
   ): void {
+    liveChips = [];
+    liveEliminated = eliminated;
+
     const containerRect = container!.getBoundingClientRect();
     const from = {
       x: (fromRect?.left ?? containerRect.left) - containerRect.left,
@@ -275,6 +310,83 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
           delayMs,
           durationMs,
         );
+
+        liveChips.push({
+          el: chip,
+          receivedBy: id,
+          naturalWidth: naturalRect.width,
+          naturalHeight: naturalRect.height,
+          landFraction,
+        });
+      }
+    }
+  }
+
+  // The reverse of spawnTransferChips: flies every chip currently landed at
+  // a receiving candidate's stack back to the eliminated candidate's stack
+  // (growing back into a natural mini-ballot shape as it goes, mirroring the
+  // forward flight's box/style interpolation exactly in reverse) and removes
+  // it once that return flight lands, so a later "Next round" click always
+  // starts from an empty slate.
+  function reverseTransferChips(): void {
+    if (liveEliminated === null || liveChips.length === 0) return;
+    const eliminated = liveEliminated;
+    const chips = liveChips;
+    liveChips = [];
+    liveEliminated = null;
+
+    const containerRect = container!.getBoundingClientRect();
+    const target = root.querySelector<HTMLElement>(
+      `[data-fill-for="${eliminated}"]`,
+    );
+    const targetRect = target?.getBoundingClientRect();
+    const toX = (targetRect?.left ?? containerRect.left) - containerRect.left;
+    const fallbackToY =
+      (targetRect?.top ?? containerRect.top) - containerRect.top;
+    const finalToY = computeFinalFillTop(target, containerRect) ?? fallbackToY;
+
+    for (const { el, receivedBy, naturalWidth, naturalHeight, landFraction } of chips) {
+      const candidate = candidatesById.get(receivedBy);
+      const chipRect = el.getBoundingClientRect();
+      const fromBox: BoxState = {
+        x: chipRect.left - containerRect.left,
+        y: chipRect.top - containerRect.top,
+        width: chipRect.width,
+        height: chipRect.height,
+      };
+      const toBox: BoxState = {
+        x: toX,
+        y: finalToY,
+        width: naturalWidth,
+        height: naturalHeight,
+      };
+
+      // Mirrors the forward flight's stagger in reverse: the chip that
+      // landed last (highest landFraction) departs first, the one that
+      // landed first departs last, and every departure still leaves enough
+      // runway to land within the same window forward flights use.
+      const departAtMs = (1 - landFraction) * FLIGHT_DURATION_MS;
+      const durationMs = Math.min(CHIP_FLIGHT_MS, FLIGHT_DURATION_MS - departAtMs);
+      const delayMs = departAtMs;
+
+      const animation = flyTo(
+        el,
+        fromBox,
+        toBox,
+        {
+          backgroundColor: candidate?.colour ?? "#000",
+          borderWidth: "0px",
+          borderRadius: "0px",
+        },
+        { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.15rem" },
+        delayMs,
+        durationMs,
+      );
+
+      if (animation) {
+        animation.finished.then(() => el.remove()).catch(() => el.remove());
+      } else {
+        el.remove();
       }
     }
   }
@@ -314,6 +426,18 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     const transfers = controller.justTransfers;
     if (!eliminated || !transfers) return;
 
-    spawnTransferChips(transfers, preClickFillRects.get(eliminated));
+    spawnTransferChips(eliminated, transfers, preClickFillRects.get(eliminated));
+  });
+
+  // Kept in lockstep with irv-app.ts's own controller the same way next()
+  // already is: both listen on the same two buttons and perform the same
+  // bounds-checked step, so this controller's roundIndex always matches
+  // irv-app.ts's regardless of how many times the reader goes back and
+  // forth. Without this, only next() ever moved this controller's index, so
+  // a Previous click silently desynced the two and the following Next click
+  // would find controller.next() already exhausted -- spawning nothing.
+  prevButton?.addEventListener("click", () => {
+    if (!controller.prev()) return;
+    reverseTransferChips();
   });
 }

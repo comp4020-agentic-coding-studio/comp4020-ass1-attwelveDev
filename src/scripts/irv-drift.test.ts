@@ -133,6 +133,76 @@ describe("initIrvDrift", () => {
     expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(0);
   });
 
+  it("flies a just-spawned batch of chips back and removes them when Previous is clicked", async () => {
+    const { root, animateSpy } = setUp(["a", "b", "c"], false);
+    animateSpy.mockReturnValue({ finished: Promise.resolve() });
+    initIrvDrift(root, threeCandidateScenario());
+
+    clickNext(root);
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="a"]').length,
+    ).toBeGreaterThan(0);
+
+    clickPrev(root);
+
+    await vi.waitFor(() => {
+      expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(
+        0,
+      );
+    });
+  });
+
+  it("removes transfer chips instantly under reduced motion when Previous is clicked, no extra animate call", () => {
+    const { root, animateSpy } = setUp(["a", "b", "c"], true);
+    initIrvDrift(root, threeCandidateScenario());
+
+    clickNext(root);
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="a"]').length,
+    ).toBeGreaterThan(0);
+    expect(animateSpy).not.toHaveBeenCalled();
+
+    clickPrev(root);
+
+    expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(0);
+    expect(animateSpy).not.toHaveBeenCalled();
+  });
+
+  it("spawns a fresh batch of chips on Next again after Previous (regression: irv-drift's own controller must stay in lockstep across unlimited back-and-forth)", async () => {
+    const { root, animateSpy } = setUp(["a", "b", "c"], false);
+    animateSpy.mockReturnValue({ finished: Promise.resolve() });
+    initIrvDrift(root, threeCandidateScenario());
+
+    clickNext(root);
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="a"]').length,
+    ).toBeGreaterThan(0);
+
+    clickPrev(root);
+    await vi.waitFor(() => {
+      expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(
+        0,
+      );
+    });
+
+    clickNext(root);
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="a"]').length,
+    ).toBeGreaterThan(0);
+
+    clickPrev(root);
+    await vi.waitFor(() => {
+      expect(root.querySelectorAll("[data-transfer-chip-for]").length).toBe(
+        0,
+      );
+    });
+
+    clickNext(root);
+    expect(
+      root.querySelectorAll('[data-transfer-chip-for="a"]').length,
+    ).toBeGreaterThan(0);
+  });
+
   it("spawns nothing when next() can't advance because the result is already final", () => {
     const { root } = setUp(["a", "b"], false);
     initIrvDrift(root, immediateMajorityScenario());
@@ -270,6 +340,27 @@ describe("initIrvDrift", () => {
       expect((options.delay ?? 0) + options.duration).toBeLessThanOrEqual(
         600,
       );
+    }
+  });
+
+  it("fills 'both', not just 'forwards', on every staggered chip flight -- fill:'forwards' never backfills a delayed animation's first frame, so a chip appended right before its delay elapses would flash at its raw stylesheet position (top-left of the container) instead of its real departure point", () => {
+    const { root, animateSpy } = setUp(["a", "b", "c"], false);
+    initIrvDrift(root, threeCandidateScenario());
+
+    clickNext(root);
+
+    const flightCalls = animateSpy.mock.calls.filter((call) =>
+      "transform" in (call[0] as Array<Record<string, unknown>>)[0],
+    );
+    // Some of these chips carry a real, nonzero delay (per the stagger test
+    // above) -- fill must cover that window on every one of them, not just
+    // the zero-delay chips.
+    expect(flightCalls.some((call) => (call[1] as { delay?: number }).delay)).toBe(
+      true,
+    );
+    for (const call of flightCalls) {
+      const options = call[1] as { fill?: string };
+      expect(options.fill).toBe("both");
     }
   });
 

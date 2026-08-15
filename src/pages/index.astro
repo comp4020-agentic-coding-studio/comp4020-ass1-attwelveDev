@@ -2,6 +2,7 @@
 import "../styles/global.css";
 import BallotPaper from "../components/BallotPaper.astro";
 import CandidateStack from "../components/CandidateStack.astro";
+import HeroIllustration from "../components/HeroIllustration.astro";
 import { scenarioExplore } from "../data/scenario-explore";
 import { scenarioSpoiler } from "../data/scenario-spoiler";
 import { strategicBallot } from "../data/sample-ballot-strategic";
@@ -27,19 +28,31 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
       </nav>
     </header>
     <main>
-      <h1>Who Really Won?</h1>
-      <section aria-labelledby="intro-heading">
-        <h2 id="intro-heading">Same votes, different winner</h2>
-        <p>
-          You've probably marked a ballot paper before — a slip of paper
-          where you tick who you want to win. What's easy to miss is that
-          the rules for turning a stack of marked ballots into a winner
-          aren't fixed. Keep every voter's choice exactly the same, change
-          only how those ballots get counted, and a different candidate can
-          come out on top. This page walks through one hypothetical
-          election, counted two different ways, so you can watch that
-          happen for yourself.
-        </p>
+      <section class="hero" aria-labelledby="intro-heading">
+        <div class="hero-content">
+          <h1>Who Really Won?</h1>
+          <h2 id="intro-heading">Same votes, different winner</h2>
+          <p>
+            You've probably marked a ballot paper before — a slip of paper
+            where you tick who you want to win. What's easy to miss is that
+            the rules for turning a stack of marked ballots into a winner
+            aren't fixed. Keep every voter's choice exactly the same, change
+            only how those ballots get counted, and a different candidate can
+            come out on top. This page walks through one hypothetical
+            election, counted two different ways, so you can watch that
+            happen for yourself.
+          </p>
+        </div>
+        <HeroIllustration />
+        <a
+          class="hero-scroll-cue"
+          href="#fptp-ballot-intro"
+          aria-label="Scroll to how the ballot works"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M4 8 L12 16 L20 8" />
+          </svg>
+        </a>
       </section>
 
       <section class="chapter" aria-labelledby="fptp-ballot-heading">
@@ -191,7 +204,7 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
           <h2 id="irv-ballot-heading">How preferential ballots work</h2>
           <BallotPaper
             candidates={scenarioSpoiler.candidates}
-            ranking={scenarioSpoiler.groups[0].ranking}
+            ranking={scenarioSpoiler.groups[1].ranking}
             variant="full"
             mode="irv"
             hero
@@ -225,8 +238,10 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
               ))
             }
           </div>
-          <p data-testid="winner" aria-live="polite"></p>
-          <p data-testid="round-status" aria-live="polite"></p>
+          <div class="recount-status">
+            <p data-testid="round-status" aria-live="polite"></p>
+            <p data-testid="winner" aria-live="polite"></p>
+          </div>
           <div class="recount-controls">
             <button type="button" data-action="prev-round">Previous round</button>
             <button type="button" data-action="next-round">Next round</button>

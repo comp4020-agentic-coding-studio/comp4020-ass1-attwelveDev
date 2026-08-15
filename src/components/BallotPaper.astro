@@ -12,6 +12,22 @@ const { candidates, ranking, variant, mode = "irv", hero = false } = Astro.props
 
 const candidatesById = new Map(candidates.map((c) => [c.id, c]));
 const first = candidatesById.get(ranking[0]);
+
+// A real preferential ballot prints candidates in one fixed order and the
+// voter writes their own preference number next to whichever candidate they
+// rank there — so the printed order below is `candidates` (fixed), and each
+// row's number comes from where that candidate sits in `ranking`, not from
+// list position.
+const CHECK_PATH = "M3,8.5 L6.5,12 L13,4";
+// Only ranks 1-3 are ever drawn: every scenario that renders a full IRV
+// ballot has exactly 3 candidates (free play, which can grow to 6, never
+// renders a BallotPaper). A 4th candidate here is out of scope, not silently
+// dropped — see PLAN.md.
+const NUMERAL_PATHS: Record<number, string> = {
+  1: "M6,3 L8,1.4 L8,14.5",
+  2: "M3,4.2 C3,1.2 9,1 9,4.2 C9,7.6 2.5,8.6 2.5,12.6 L11,12.6",
+  3: "M3,3.2 C7,0.6 10.2,2.1 8,5.6 C11.2,6.6 10.6,11.2 6.5,12.1 C4.5,12.6 3,11.5 3,10.4",
+};
 ---
 
 {
@@ -19,42 +35,77 @@ const first = candidatesById.get(ranking[0]);
     <div class="ballot-paper ballot-paper-full" data-hero-ballot={hero ? ranking[0] : undefined}>
       <p class="ballot-paper-heading">Ballot paper</p>
       {mode === "irv" ? (
-        <ol class="ballot-paper-ranking">
-          {ranking.map((id) => {
-            const candidate = candidatesById.get(id);
-            if (!candidate) return null;
-            return (
-              <li>
-                <span
-                  class={`candidate-stack-swatch candidate-stack-swatch-${candidate.shape}`}
-                  style={`--swatch-colour: ${candidate.colour};`}
-                  aria-hidden="true"
-                />
-                {candidate.label}
-              </li>
-            );
-          })}
-        </ol>
+        <>
+          <p class="ballot-paper-instructions">
+            Number the boxes from 1 to {candidates.length} in the order of
+            your preference.
+          </p>
+          <ul class="ballot-paper-ranking">
+            {candidates.map((candidate) => {
+              const rank = ranking.indexOf(candidate.id) + 1;
+              return (
+                <li>
+                  <span
+                    class="ballot-paper-number-box"
+                    data-pref-rank={rank}
+                    aria-hidden="true"
+                  >
+                    <svg
+                      class="ballot-paper-mark ballot-paper-number-mark"
+                      viewBox="0 0 16 16"
+                    >
+                      <path d={NUMERAL_PATHS[rank]} />
+                    </svg>
+                  </span>
+                  <span
+                    class={`candidate-stack-swatch candidate-stack-swatch-${candidate.shape}`}
+                    style={`--swatch-colour: ${candidate.colour};`}
+                    aria-hidden="true"
+                  />
+                  {candidate.label}
+                  <span class="sr-only">
+                    , ranked {rank} of {candidates.length}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       ) : (
-        <ul class="ballot-paper-ranking">
-          {candidates.map((candidate) => {
-            const checked = candidate.id === ranking[0];
-            return (
-              <li>
-                <span
-                  class={`ballot-paper-checkbox ${checked ? "ballot-paper-checkbox-checked" : ""}`}
-                  aria-hidden="true"
-                />
-                <span
-                  class={`candidate-stack-swatch candidate-stack-swatch-${candidate.shape}`}
-                  style={`--swatch-colour: ${candidate.colour};`}
-                  aria-hidden="true"
-                />
-                {candidate.label}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <p class="ballot-paper-instructions">
+            Place one tick in the box next to your choice.
+          </p>
+          <ul class="ballot-paper-ranking">
+            {candidates.map((candidate) => {
+              const checked = candidate.id === ranking[0];
+              return (
+                <li>
+                  <span
+                    class={`ballot-paper-checkbox ${checked ? "ballot-paper-checkbox-checked" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {checked && (
+                      <svg
+                        class="ballot-paper-mark ballot-paper-check-mark"
+                        viewBox="0 0 16 16"
+                      >
+                        <path d={CHECK_PATH} />
+                      </svg>
+                    )}
+                  </span>
+                  <span
+                    class={`candidate-stack-swatch candidate-stack-swatch-${candidate.shape}`}
+                    style={`--swatch-colour: ${candidate.colour};`}
+                    aria-hidden="true"
+                  />
+                  {candidate.label}
+                  {checked && <span class="sr-only">, your choice</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
     </div>
   ) : (

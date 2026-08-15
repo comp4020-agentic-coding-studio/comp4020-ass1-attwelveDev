@@ -826,6 +826,398 @@ Checks:
   1920×1080 confirm the same visually (ballot paper visible in its card while
   the prose column shows the section above).
 
+## Feature: IRV transfer animation reverses on Previous, plus round-1 leading/final-round winner highlights
+
+Reported bug: clicking "Previous round" in the IRV recount silently desynced
+`irv-drift.ts`'s own chip-transfer animation from `irv-app.ts`'s round state —
+after the first "Previous" click, clicking "Next round" again produced no
+chip animation at all. Separately, the user asked for the same leading-
+candidate treatment explore/spoiler/free play already have (see "drag-on-
+stack sliders..." above) to also appear in the IRV recount, so round 1 makes
+clear who's ahead before any elimination and the final round makes clear who
+actually won.
+
+- **Root cause of the desync**: `irv-app.ts` and `irv-drift.ts` each own a
+  separate `IrvController` instance (a deliberate sibling-controller split,
+  documented in both files), both listening independently to the same
+  Next/Previous buttons. `irv-drift.ts` only ever listened for "Next" clicks
+  — it had no "Previous" handler at all — so its own `roundIndex` fell
+  behind `irv-app.ts`'s the moment a reader clicked "Previous", and every
+  subsequent "Next" click called `controller.next()` on an already-wrong
+  round.
+- **Fix**: added a symmetric `prevButton` listener to `irv-drift.ts` that
+  calls `controller.prev()` and a new `reverseTransferChips()`, which flies
+  every still-live chip from its landed position back to the eliminated
+  candidate's revived stack (mirroring the forward flight's spring/box-morph
+  mechanism and reusing `computeFinalFillTop()` for the same "read past a
+  still-transitioning CSS height" reason it already existed), removing each
+  chip once its own `Animation.finished` promise resolves (or immediately
+  under reduced motion). A `LiveChip[]` list tracks the current in-flight
+  batch so `spawnTransferChips`/`reverseTransferChips` always start from a
+  clean slate — chips never pile up or double-process across any number of
+  Next/Previous cycles.
+- **Leading/winner highlight**: reuses 100% of the existing `.is-leading`
+  amber badge/glow markup and CSS (`CandidateStack.astro`/`global.css`), no
+  new markup needed. `irv-app.ts` gained `currentLeader(counts)` — the same
+  synthetic-single-preference-tally-via-`tallyFptp` trick `app.ts`'s
+  `currentWinner()` already uses, adapted to take a round's `counts`
+  explicitly — and toggles `is-leading`/`is-winner` on each candidate's stack
+  every `render()`, swapping the shared badge's text between "Leading" and
+  "Winner". `global.css` gained a new `.is-winner` rule reusing the same gold
+  token family (per this file's Design-system rule that candidate hues and
+  the leader-badge gold are reserved) but with a doubled box-shadow ring, so
+  the final-round treatment reads as more emphatic than "leading" without a
+  new colour.
+
+Checks:
+- `irv-drift.test.ts` — new tests assert a just-spawned batch of chips flies
+  back and is removed on Previous (`vi.waitFor`); that reduced motion removes
+  them instantly with no extra `animate` call; and a regression test that
+  clicks Next → Previous → Next → Previous → Next and asserts a fresh batch
+  of chips spawns every time, not just the first.
+- `irv-app.test.ts` — new tests assert round 1's actual leader gets
+  `is-leading` + a "Leading" badge (and no one else does); that the final
+  round switches to `is-winner` + a "Winner" badge and clears `is-leading`
+  everywhere; and that stepping back to round 1 restores `is-leading` and
+  clears `is-winner`.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 136
+  tests passing.
+- Manual browser pass (`agent-browser` against `pnpm dev`) at both marking
+  viewports: clicked Next → Previous → Next → Previous → Next (3 forward
+  cycles, 2 reverse) and visually confirmed a genuine reverse animation —
+  chips flying from Aster's stack back to Birch's — every time "Previous"
+  was clicked, and a fresh forward batch every time "Next" was clicked
+  afterward, with no leftover chips and no console errors. Confirmed Cedar
+  shows "Leading" with an amber glow on round 1 (Cedar 380 > Aster 320 >
+  Birch 300), switching to Aster showing "Winner" with a visibly bolder
+  doubled ring on round 2, and Cedar's "Leading" state correctly clearing —
+  toggling correctly in both directions, at both 1920×1080 and 390×844.
+
+## Feature: recount status copy, a stray swarm line left behind by elimination, and a one-line status/winner readout
+
+Three follow-up requests against the IRV recount section after the
+leading/winner highlight work above landed:
+
+- Round 1's status text just said "Round 1." with no candidate named, unlike
+  round 1's `.is-leading` badge which already names Cedar — inconsistent.
+  Round 2's markup also put the winner announcement (`<p
+  data-testid="winner">`) *before* the round-status paragraph in
+  `index.astro`, so a screen reader (or anyone reading top to bottom) heard
+  "Aster wins" before "Birch is eliminated" — backwards causally.
+- **Fix**: `irv-app.ts`'s `render()` now hoists `winner`/`leader` to the top
+  of the function (previously computed twice) and, when there's no
+  elimination yet, sets `statusEl` to `Round ${n}: ${leader} is leading.`
+  instead of a bare `Round ${n}.`. `index.astro` swaps the two `<p>`
+  elements' order so `round-status` (the cause) precedes `winner` (the
+  effect) in the DOM regardless of any CSS layout on top.
+- A reader noticed a colour-matched line remained stuck at the top of a
+  candidate's stack bar after that candidate was eliminated and their live
+  fill collapsed to nothing. **Root cause**: `bootstrap.ts` runs
+  `initBallotDrift` on `#recount-app` too (for the same one-shot "ballot
+  swarm drifts into each stack" illustration explore/spoiler get), and that
+  swarm's landed chips are placed once, permanently (`fill: "forwards"`), at
+  each candidate's *round-1* fill position. The existing stale-swarm fix
+  (see "drag-on-stack sliders..." above) only ever retires that illustration
+  on an `"input"` event, because explore/spoiler/free play invalidate it by
+  dragging a slider — but the recount section has no sliders, only
+  Next/Previous round buttons, so `clearSwarm()` was never wired to fire
+  there at all, and a candidate's swarm chips just sat frozen at their
+  original height forever, including past their own elimination.
+- **Fix**: `ballot-drift.ts` now also wires `clearSwarm` to a one-shot click
+  listener on `targetRoot`'s `[data-action="next-round"]` and
+  `[data-action="prev-round"]` buttons (a no-op for explore/spoiler/free
+  play, which have neither button), so the very first round change retires
+  the illustration the same way a slider drag already does everywhere else.
+- The same reader asked for the round-status and winner text to render on
+  one visual line, so the sticky `.chapter-viz` card doesn't change height
+  between round 1 (status only) and the final round (status + winner).
+  **Fix**: wrapped both `<p>`s in a `.recount-status` flex row
+  (`global.css`) with `flex-wrap: wrap` and `column-gap`, zeroing each
+  `<p>`'s own margin — each keeps its own `aria-live="polite"` region (still
+  announced separately, in the same DOM order as before), they just flow
+  onto one line visually instead of stacking as two block paragraphs.
+
+Checks:
+- `irv-app.test.ts` — new tests assert round 1's status text names the
+  leader (`"Round 1: A is leading."`) and that, after advancing a round, the
+  round-status and winner `data-testid` elements appear in that order in the
+  DOM (`querySelectorAll("[data-testid]")` index comparison, since this
+  project's jsdom/vitest setup doesn't expose a bare `Node` global for
+  `compareDocumentPosition`).
+- `ballot-drift.test.ts` — a new test builds a section with recount-style
+  next/prev buttons (no sliders) and asserts clicking "Next round" fades and
+  removes the swarm's landed `.ballot-paper-mini` chips, mirroring the
+  existing slider-driven `clearSwarm` test.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 139
+  tests passing.
+- Manual browser pass (`agent-browser` against `pnpm dev`) confirmed: round
+  1 reads "Round 1: Cedar is leading."; after "Next round", the line reads
+  "Round 2: Birch is eliminated. Aster wins after the recount." on one
+  visual line with no visible height change in the sticky card; no stray
+  coloured line remains in any bar after elimination, in either direction
+  (Next then Previous); no console errors.
+
+## Feature: a flash of a stray ballot chip near Aster's stack on Next round
+
+A reader reported a small ballot card flashing briefly next to Aster's stack,
+in the top-left corner, right when clicking "Next round" — gone almost
+immediately.
+
+- **Root cause**: `irv-drift.ts`'s `flyTo()` staggers each transfer chip's
+  departure with a real `delayMs` (see "hero handoff, premature hero
+  re-trigger, transfer stagger..." above), and its `el.animate()` call used
+  `fill: "forwards"`. WAAPI's `"forwards"` only ever backfills the
+  animation's *last* keyframe once it completes — during the delay before a
+  delayed animation starts, it applies nothing at all. A chip element is
+  appended to the DOM and `animate()` is called on it immediately, but for
+  the length of that chip's `delayMs` it rendered at its raw, un-animated
+  stylesheet position instead: `.ballot-paper-mini { position: absolute;
+  top: 0; left: 0 }`, i.e. the top-left corner of
+  `.candidate-columns[data-ballot-drift]` — which is exactly where Aster's
+  column sits, since Aster is first in the row.
+- **Fix**: changed `fill: "forwards"` to `fill: "both"` in `flyTo()`.
+  `"both"` also holds the animation's *first* keyframe for the entire delay
+  window, so a chip renders at its real starting position (already set as
+  the first keyframe, matching its departure point) from the instant it's
+  appended, not just from the instant its flight actually begins.
+
+Checks:
+- `irv-drift.test.ts` — a new test asserts every staggered chip flight
+  passes `fill: "both"` to `animate()`, confirming at least one of those
+  flights genuinely carries a nonzero delay (so the assertion isn't
+  vacuous).
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 140
+  tests passing.
+- Manual browser pass (`agent-browser` against `pnpm dev`) confirmed: no
+  visible flash or stray chip near Aster's stack across several "Next
+  round"/"Previous round" clicks, watched at real animation speed; no
+  console errors.
+
+## Feature: realistic ballot papers with a hand-drawn fill-in animation
+
+The full ballot paper (`BallotPaper.astro`, `variant="full"`) read more like
+a schematic than a ballot someone actually marks: a small 0.9rem checkbox
+with a text-glyph tick, and an IRV ranking rendered as a preference-sorted
+`<ol>` where the printed "1./2./3." was really just list position, not
+something a voter wrote in themselves. Requested: bigger boxes, a real
+numbered box per IRV candidate, a bigger checkmark, and a hand-drawn
+draw-in animation the first time each ballot scrolls into focus — numbers
+appearing in the voter's own preference order (1, then 2, then 3), each
+traced like handwriting.
+
+Also decided along the way: keep the tree/plant candidate names (Aster,
+Birch, Cedar, etc.) rather than switch to human names — confirmed with the
+user, since apolitical names keep the piece about the counting mechanism,
+not a cast of characters. And: the IRV hero ballot's own ranking (the one
+introduced in "How preferential ballots work") changed to Birch=1, Aster=2,
+Cedar=3 (reusing `scenarioSpoiler.groups[1]`, the same 300-voter block the
+recount narrative already eliminates first) so it flows into the following
+"Recounting the same election under IRV" section, where that hero now flies
+into Birch's stack instead of Aster's.
+
+- **Markup/CSS realism** (`BallotPaper.astro`, `global.css`): checkbox and
+  new `.ballot-paper-number-box` both grew to 1.4rem with a thicker border;
+  the CSS text-glyph tick was replaced by a real inline `<svg><path>`
+  checkmark so it has an actual path to stroke-animate (a pseudo-element's
+  `content` string can't be). The IRV list changed from iterating `ranking`
+  (list position *was* the rank) to iterating the fixed `candidates` prop,
+  computing `rank = ranking.indexOf(candidate.id) + 1` per row and printing
+  it in a numbered box with its own hand-authored SVG numeral path — since a
+  real preferential ballot prints one fixed candidate order and the voter
+  writes their own number next to whichever candidate they rank. Added a
+  printed instruction line per mode ("Number the boxes 1 to n…" / "Place one
+  tick…"), and a new `.sr-only` utility + per-row visually-hidden "ranked N
+  of M" text, since the fixed-order list lost the `<ol>`'s implicit
+  position-equals-rank semantics that screen readers relied on before.
+  Bounded to ranks 1–3 (documented in code): every scenario that renders a
+  full IRV ballot has exactly 3 candidates; free play (which can grow to 6)
+  never renders a `BallotPaper`, only `CandidateStack`s.
+- **Hand-drawn fill-in** (new `src/scripts/ballot-marks.ts`, wired into
+  `bootstrap.ts` as one global `initBallotMarks(document)` call): per full
+  ballot, an `IntersectionObserver` (`threshold: 0`, `rootMargin: "-35% 0px
+  -35% 0px"`, matching `ballot-drift.ts`'s swarm observer — fire once on the
+  first "substantially in view" report, disconnect, no bidirectional
+  transition tracking needed since a mark only ever draws once) triggers
+  `getTotalLength()`/`stroke-dasharray`/`stroke-dashoffset` WAAPI strokes:
+  the checkmark draws over 350ms; the three preference numbers draw 350ms
+  each, staggered 280ms apart, sorted by `data-pref-rank` ascending (not DOM
+  order) so they always animate 1 → 2 → 3 regardless of which box a given
+  candidate's number happens to print in. CSS defaults every mark's
+  `stroke-dashoffset` to `0` (fully drawn); the script only sets the hidden
+  start state right before it plays a real animation, so a slow script or
+  missing `Element.animate`/`IntersectionObserver` never leaves a mark
+  invisible — it falls back to CSS's already-drawn default instead.
+  `prefers-reduced-motion` skips animating entirely, same reason.
+
+Checks:
+- `ballot-marks.test.ts` (new): asserts the observer gates drawing until a
+  ballot is scrolled into the centred band, disconnects after firing once
+  (no redraw on a later re-scroll), draws the checked box's tick, draws IRV
+  preference numbers in ascending `data-pref-rank` order with distinct
+  staggered delays regardless of DOM position, skips animating under
+  reduced motion (leaving the CSS default alone), and falls back to drawing
+  immediately when `IntersectionObserver` isn't available.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 149
+  tests passing.
+- Manual browser pass (`agent-browser` against `pnpm preview`, both marking
+  viewports) confirmed: marks genuinely read as hand-drawn (not a mechanical
+  wipe) at real speed; IRV numbers visibly draw in 1 → 2 → 3 order regardless
+  of printed position; no redraw on scrolling away and back; no flash of an
+  invisible/undrawn mark before the observer fires; the IRV hero ballot's
+  fly-into-recount animation now targets Birch's stack; reduced-motion shows
+  every mark already drawn; no console errors.
+
+## Feature: full-height intro hero, an original illustration, and a scroll cue
+
+The page opened with a bare `<h1>` directly under `<main>`, immediately
+followed by a plain, no-set-height intro `<section>` — so on load, the next
+section's sticky "How the ballot works" card was already visible, cutting
+against the introduction's job of giving the reader a reason to keep
+scrolling before teaching them anything. Requested: make the intro fill the
+viewport so nothing peeks through, add a scroll-down indicator, and add
+something visually appealing beyond plain text. Two decisions confirmed
+with the user up front: an **original SVG illustration** built in the
+site's own shape/colour vocabulary (not a real photo), and an **animated
+chevron only** for the scroll cue (no text label).
+
+- **Layout** (`index.astro`, `global.css`): the `<h1>` and the old intro
+  section's heading/paragraph are now wrapped together in one
+  `<section class="hero">`, alongside the new illustration and scroll cue.
+  `.hero` is `min-height: 100vh` / `100dvh` (the `dvh` line wins where
+  supported, ignored otherwise) so the next card never peeks in on load —
+  `min-height`, not `height`, so a phone viewport with more copy than fits
+  one screen just grows taller rather than clipping. Single column on
+  mobile, two-column (text / illustration) above 900px, matching the
+  existing `.chapter`/`.chapter-viz` row-column switch stylistically
+  without reusing those exact classes (the hero needs no sticky/order
+  semantics). `.hero-content` now owns the `--prose-max-width` cap directly,
+  since it's no longer a direct `section` child of the old generic
+  `main > section:not(.chapter) > h2, > p` selector.
+- **Illustration** (new `src/components/HeroIllustration.astro`): a static
+  inline SVG — a ballot box (with a lid seam, a recessed front panel, and a
+  flat grounding shadow beneath it, so it reads as an object sitting on a
+  surface rather than a blank card) with two ballot papers, one mid-slot —
+  reusing the same circle/square/triangle shape techniques already used for
+  candidate swatches, but restricted entirely to the neutral chrome palette
+  tokens (paper/surface/ink/ink-muted/hairline/accent) — never a candidate
+  hue or the leader-badge gold, since those are reserved for real vote
+  data. The user initially found the first pass "cheap and low quality" and
+  asked about a real photo background instead; the design system's
+  editorial/original-illustration commitment argued against a photo, so the
+  fix was to raise the SVG's craft instead: the tick and preference-number
+  marks on the two ballot papers are now the *exact same* hand-lettered
+  Bezier paths `BallotPaper.astro` draws for the real ballots
+  (`CHECK_PATH`/`NUMERAL_PATHS[1]`, reused via a nested `<svg>` per mark, one
+  coordinate space inside another) rather than a second, cruder set of
+  straight-line marks invented just for the hero — so the scene shows the
+  same artefact the reader goes on to mark later. Every added shape (the
+  seam line, the panel, the grounding ellipse) stays inside this codebase's
+  existing flat/hairline elevation vocabulary (confirmed via a `global.css`
+  sweep: no `box-shadow`/`filter`/gradient exists anywhere outside the
+  focus ring) — no drop-shadows or gradients were introduced, since that
+  would read as a design-system inconsistency, not a polish upgrade.
+  Deliberately not animated: per this file's animation rule, a decorative
+  scene doesn't teach the reader a fact the way the ballot-flight
+  animations do, so motion here is reserved for the scroll cue only. Its
+  sizing class is hardcoded directly on the component's root `<svg>` rather
+  than accepted as a prop, matching this repo's existing convention
+  (`BallotPaper.astro`/`CandidateStack.astro` take explicit named props,
+  not a generic `class` passthrough) — a `class="hero-illustration"` passed
+  from the call site would silently not reach the SVG, since Astro doesn't
+  auto-forward a `class` prop onto a child component's root element.
+- **Scroll cue** (`.hero-scroll-cue`, pure markup + CSS, no new script): a
+  real `<a href="#fptp-ballot-intro">` (the existing sticky viz card's id)
+  wrapping a chevron `<svg>`, keyboard-reachable with a real accessible
+  name. A new CSS `@keyframes` bounce — the project's first purely
+  CSS-driven animation — guarded by its own
+  `@media (prefers-reduced-motion: reduce)` block (every other animation in
+  this codebase is WAAPI/JS, gated via `matchMedia`, so this needed a
+  CSS-level guard instead). `html { scroll-behavior: smooth }` is wrapped in
+  `@media (prefers-reduced-motion: no-preference)`, so the anchor jump is
+  smooth normally and instant for reduced-motion readers, with zero JS.
+  Below 900px the cue is `position: sticky; bottom: var(--space-lg)`
+  (pinned to the *viewport's* bottom edge) rather than placed via flex
+  `justify-content: space-between` (which would pin it to the *hero's own*
+  bottom edge) — see the first bug fixed below for why that distinction
+  matters. At 900px and up it switches to `position: absolute`, centred
+  under the two-column row.
+
+Three bugs turned up during the manual browser pass and got fixed before
+this was called done:
+1. **Scroll cue below the fold at both viewports.** `<header>` (~66px) plus
+   `main`'s own top padding (`--space-xl`, 64px) sat above `.hero` before
+   its `100vh`/`100dvh` min-height calculation even started, pushing the
+   flex-`space-between`-positioned cue about 130px past the real viewport
+   bottom. Fixed with a negative-margin/padding swap on `.hero`
+   (`margin-top: calc(-1 * var(--space-xl))` cancels `main`'s padding,
+   `padding-top: var(--space-xl)` re-adds the same visual gap *inside*
+   `.hero`'s own box) plus a new `--header-height: 66px` token, so
+   `min-height: calc(100dvh - var(--header-height))` lands the hero's true
+   bottom flush with the viewport.
+2. **Scroll cue still below the fold at 390×844 specifically**, even after
+   fix 1. Root cause was different: the hero's real copy (headline +
+   subheading + the paragraph) plus the illustration naturally render
+   taller than one 390×844 screen, so a cue pinned to the hero's own
+   (content-driven, now-overflowing) bottom edge via `space-between` was
+   never going to be on-screen at load, regardless of the header fix. Fixed
+   by switching `.hero-scroll-cue` to `position: sticky` below 900px (see
+   the Scroll cue bullet above) — this keeps the cue anchored to the
+   *viewport's* bottom edge from the first paint, independent of how tall
+   the hero's actual content turns out to be.
+3. **Illustration rendering far larger than intended, and overlapping the
+   scroll cue at 390×844 after fix 2.** `class="hero-illustration"` was
+   being passed from `index.astro` to `<HeroIllustration />`, but the
+   component's frontmatter never forwarded it onto the root `<svg>` — Astro
+   doesn't do that automatically — so the sizing rule never applied at all,
+   and the SVG stretched to the full width of its flex container instead.
+   Fixed per the Illustration bullet above; also removed a since-redundant
+   `.hero-illustration-art { width: 100%; height: auto }` rule that would
+   otherwise have won the cascade over the (now correctly attached)
+   `.hero-illustration` sizing rule on the same element, and shrank the
+   mobile illustration further (`min(38vw, 16rem)`, down from `60vw`).
+4. **The cue/illustration overlap came back at 390×844 during the
+   illustration-craft pass above**, and turned out to be structural rather
+   than a one-off sizing mistake: at that width the hero's real copy alone
+   is already taller than one screen, so the illustration — which flows
+   normally, unlike the sticky cue — can end anywhere below the fold
+   depending on exactly how the copy wraps, while the cue is always pinned
+   near the viewport's bottom edge. Shrinking the illustration enough to
+   guarantee clearance in every case would mean rendering it too small to
+   read. Fixed by treating the cue as a self-contained floating badge
+   instead of fighting the vertical-space budget: `.hero-scroll-cue` now
+   has an opaque `background: var(--colour-paper)` (matching the page
+   background, not the illustration) and a circular `border-radius: 50%` +
+   hairline border, with `z-index: 1` so it paints in front of whatever the
+   illustration is doing underneath it. The two elements' bounding boxes
+   still overlap geometrically — confirmed via `agent-browser`, illustration
+   bottom ~825px vs. cue top ~762px at 390×844 — but the badge cleanly
+   occludes the overlap, so it reads as an intentional floating "scroll"
+   affordance rather than a tangle of SVG lines. Confirmed by cropping and
+   zooming a screenshot of that exact region (a plain "is the cue within the
+   viewport" bounding-rect check can't see a visual collision like this —
+   only looking at the rendered pixels can).
+
+Checks:
+- `spec/invariants.test.ts` and `src/styles/contrast.test.ts` stay green —
+  the restructuring keeps exactly one `<h1>` and doesn't introduce any new
+  text/background colour pairing outside what's already covered.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green.
+- Manual browser pass (`pnpm preview`, both marking viewports), confirmed
+  via `agent-browser` with real bounding-rect measurements and screenshots
+  — including cropped/zoomed screenshots of the cue/illustration region, not
+  just thumbnails — at both 1920×1080 and 390×844: the next section's card
+  never peeks through on load at either viewport (`#fptp-ballot-intro` sits
+  at ~1288px/desktop and ~972px/mobile, both well past the fold); the
+  scroll cue is fully within the viewport at load and its badge treatment
+  reads as a clean floating affordance rather than a collision with the
+  illustration at mobile (see bug 4 above); the illustration renders at its
+  intended size, its tick/number marks match `BallotPaper.astro`'s real
+  hand-lettered paths, and it uses only chrome-palette tones — no candidate
+  hues or the leader-badge gold visible; the cue remains a real,
+  keyboard-focusable anchor (confirmed a visible focus outline via
+  `getComputedStyle`) and clicking/activating it scrolls to "How the ballot
+  works"; no console errors at either viewport.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice

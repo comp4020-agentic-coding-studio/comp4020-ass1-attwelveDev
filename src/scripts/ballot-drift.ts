@@ -262,6 +262,18 @@ export function initBallotDrift(
 
   targetRoot.addEventListener("input", clearSwarm, { once: true });
 
+  // The recount section has no sliders -- its counts change from the
+  // next/prev round buttons instead -- so the swarm needs the same
+  // one-shot retirement triggered from there too, or its frozen chips (laid
+  // down at round 1's fill positions) sit unclaimed over every later round,
+  // including rounds where the candidate they were drawn for has since been
+  // eliminated and its live fill has collapsed out from under them.
+  for (const action of ["next-round", "prev-round"]) {
+    targetRoot
+      .querySelector(`[data-action="${action}"]`)
+      ?.addEventListener("click", clearSwarm, { once: true });
+  }
+
   // Whether the reader has actually scrolled the target section (the hero's
   // landing spot) into view at some point. When the hero lives in its own
   // separate intro chapter, its own IntersectionObserver regaining

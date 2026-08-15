@@ -1,0 +1,99 @@
+---
+// A static, original scene -- a ballot box with two ballot papers, one
+// mid-slot -- built from the same shape vocabulary as the candidate
+// swatches and the real ballot papers elsewhere on the page. The tick and
+// preference-number marks below are the exact same hand-lettered paths
+// BallotPaper.astro draws (CHECK_PATH / NUMERAL_PATHS[1] there) -- reusing
+// them here, via a nested <svg> per mark, means this scene shows the same
+// artefact the reader goes on to mark later, rather than inventing a
+// second, cruder mark style just for the hero. Deliberately restricted to
+// the neutral chrome palette tokens only (never a candidate hue or the
+// leader-badge gold): this is scene-setting chrome, not a candidate. No
+// animation here -- see CLAUDE.md's animation rule and PLAN.md for why
+// motion is reserved for the scroll cue instead.
+const CHECK_PATH = "M3,8.5 L6.5,12 L13,4";
+const NUMERAL_ONE_PATH = "M6,3 L8,1.4 L8,14.5";
+---
+
+<svg
+  class="hero-illustration hero-illustration-art"
+  viewBox="0 0 240 200"
+  role="img"
+  aria-hidden="true"
+  focusable="false"
+>
+  <ellipse class="hero-illustration-ground" cx="120" cy="187" rx="68" ry="6" />
+  <rect
+    class="hero-illustration-box"
+    x="55"
+    y="112"
+    width="130"
+    height="72"
+    rx="6"
+  />
+  <line
+    class="hero-illustration-box-seam"
+    x1="55"
+    y1="132"
+    x2="185"
+    y2="132"
+  />
+  <rect
+    class="hero-illustration-box-panel"
+    x="65"
+    y="142"
+    width="110"
+    height="34"
+    rx="4"
+  />
+  <path class="hero-illustration-slot-rim" d="M94,100 Q120,93 146,100" />
+  <rect
+    class="hero-illustration-slot"
+    x="98"
+    y="100"
+    width="44"
+    height="8"
+    rx="2"
+  />
+
+  <g class="hero-illustration-paper" transform="rotate(-7 158 96)">
+    <rect x="136" y="44" width="46" height="68" rx="3" />
+    <line x1="145" y1="58" x2="175" y2="58" />
+    <line x1="145" y1="66" x2="169" y2="66" />
+    <line x1="145" y1="74" x2="172" y2="74" />
+    <rect
+      class="hero-illustration-mark-box"
+      x="145"
+      y="86"
+      width="12"
+      height="12"
+      rx="2"
+    />
+    <svg x="145" y="86" width="12" height="12" viewBox="0 0 16 16">
+      <path class="hero-illustration-mark-tick" d={CHECK_PATH} />
+    </svg>
+    <circle class="hero-illustration-mark-accent" cx="171" cy="99" r="4" />
+  </g>
+
+  <g class="hero-illustration-paper" transform="rotate(8 96 84)">
+    <rect x="72" y="34" width="46" height="68" rx="3" />
+    <line x1="81" y1="48" x2="111" y2="48" />
+    <line x1="81" y1="56" x2="105" y2="56" />
+    <line x1="81" y1="64" x2="108" y2="64" />
+    <rect
+      class="hero-illustration-mark-box"
+      x="81"
+      y="76"
+      width="12"
+      height="12"
+      rx="2"
+    />
+    <svg x="81" y="76" width="12" height="12" viewBox="0 0 16 16">
+      <path class="hero-illustration-mark-number" d={NUMERAL_ONE_PATH} />
+    </svg>
+    <polygon
+      class="hero-illustration-mark-accent"
+      points="109,90 113,97 105,97"
+    />
+  </g>
+</svg>

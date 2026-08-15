@@ -28,6 +28,11 @@
   --content-max-width: 72rem;
   --prose-max-width: 34rem;
   --section-gap: clamp(4rem, 10vw, 9rem);
+
+  /* Rendered height of <header> (nav padding + line box + border) -- used
+   * so .hero's "fill the viewport" math can account for the space the
+   * header already consumes above it, not just the raw 100vh. */
+  --header-height: 66px;
 }
 
 body {
@@ -37,6 +42,12 @@ body {
   line-height: 1.7;
   color: var(--colour-ink);
   background: var(--colour-paper);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 main {
@@ -162,17 +173,229 @@ main > section {
   margin-block: var(--section-gap);
 }
 
-main > section:first-of-type {
+main > section:last-of-type {
+  margin-bottom: 0;
+}
+
+main > section:first-of-type:not(.hero) {
   margin-top: 0;
 }
 
-main > section:last-of-type {
-  margin-bottom: 0;
+/*
+ * Round status and the winner announcement read as one sentence flowing
+ * onto the same line (rather than two stacked paragraphs) so the sticky
+ * card doesn't change height the moment the winner text appears on the
+ * final round -- each <p> keeps its own aria-live="polite" region so
+ * screen readers still announce the elimination and the win separately,
+ * in the same reading order they appear here.
+ */
+.recount-status {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.4em;
+}
+
+.recount-status p {
+  margin: 0;
 }
 
 main > section:not(.chapter) > h2,
 main > section:not(.chapter) > p {
   max-width: var(--prose-max-width);
+}
+
+/*
+ * Full viewport height so the next section's sticky card never peeks
+ * through on load -- the reader gets one uninterrupted opening screen
+ * before anything else appears. min-height (not height) so a phone
+ * viewport with more copy than fits one screen simply grows taller,
+ * rather than clipping content.
+ *
+ * The negative margin-top cancels out main's own top padding (re-applied
+ * below as this section's own padding-top instead) so that padding counts
+ * toward the min-height budget below, rather than adding on top of a full
+ * 100dvh and pushing the section's own bottom edge (and the scroll cue
+ * pinned to it) below the fold.
+ */
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-top: calc(-1 * var(--space-xl));
+  padding-top: var(--space-xl);
+  min-height: calc(100vh - var(--header-height));
+  min-height: calc(100dvh - var(--header-height));
+}
+
+.hero-content {
+  max-width: var(--prose-max-width);
+}
+
+.hero-content h1 {
+  margin-bottom: var(--space-md);
+}
+
+.hero-illustration {
+  align-self: center;
+  width: min(38vw, 16rem);
+  height: auto;
+}
+
+.hero-illustration-ground {
+  fill: var(--colour-hairline);
+}
+
+.hero-illustration-box {
+  fill: var(--colour-surface);
+  stroke: var(--colour-hairline);
+  stroke-width: 2;
+}
+
+.hero-illustration-box-seam {
+  stroke: var(--colour-hairline);
+  stroke-width: 1.5;
+}
+
+.hero-illustration-box-panel {
+  fill: var(--colour-paper);
+  stroke: var(--colour-hairline);
+  stroke-width: 1.5;
+}
+
+.hero-illustration-slot-rim {
+  fill: none;
+  stroke: var(--colour-hairline);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.hero-illustration-slot {
+  fill: var(--colour-ink);
+}
+
+.hero-illustration-paper rect:first-child {
+  fill: var(--colour-paper);
+  stroke: var(--colour-hairline);
+  stroke-width: 1.5;
+}
+
+.hero-illustration-paper line {
+  stroke: var(--colour-ink-muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.hero-illustration-mark-box {
+  fill: none;
+  stroke: var(--colour-ink);
+  stroke-width: 1.5;
+}
+
+.hero-illustration-mark-tick,
+.hero-illustration-mark-number {
+  fill: none;
+  stroke: var(--colour-ink);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hero-illustration-mark-accent {
+  fill: var(--colour-accent);
+}
+
+/*
+ * position: sticky (not a static flex-flow position) so the cue tracks the
+ * *viewport's* bottom edge rather than the hero's own bottom edge: on a
+ * narrow viewport where the headline+copy naturally run taller than one
+ * screen, a flex-flow position at the very end of .hero would sit below the
+ * fold on load. Sticky keeps it pinned just above the visible bottom edge
+ * the moment the page renders, regardless of how tall the hero's content
+ * ends up being, and it settles back into flow once the hero's real bottom
+ * scrolls into view.
+ */
+.hero-scroll-cue {
+  position: sticky;
+  z-index: 1;
+  bottom: var(--space-lg);
+  align-self: center;
+  display: inline-flex;
+  padding: var(--space-2xs);
+  background: var(--colour-paper);
+  border: 1px solid var(--colour-hairline);
+  border-radius: 50%;
+  color: var(--colour-ink-muted);
+  animation: hero-scroll-cue-bounce 1.6s ease-in-out infinite;
+}
+
+.hero-scroll-cue svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hero-scroll-cue:hover {
+  color: var(--colour-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-scroll-cue {
+    animation: none;
+  }
+}
+
+@keyframes hero-scroll-cue-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(0.4rem);
+  }
+}
+
+@media (width >= 900px) {
+  .hero {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4rem;
+  }
+
+  .hero-content {
+    flex: 0 1 var(--prose-max-width);
+  }
+
+  .hero-illustration {
+    flex: 1 1 0;
+    align-self: center;
+    width: min(100%, 20rem);
+  }
+
+  .hero-scroll-cue {
+    position: absolute;
+    bottom: var(--space-xl);
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  @keyframes hero-scroll-cue-bounce {
+    0%,
+    100% {
+      transform: translateX(-50%) translateY(0);
+    }
+
+    50% {
+      transform: translateX(-50%) translateY(0.4rem);
+    }
+  }
 }
 
 /*
@@ -373,13 +596,31 @@ main > section:not(.chapter) > p {
   border-radius: 999px;
 }
 
-.candidate-stack.is-leading .candidate-stack-leader-badge {
+.candidate-stack.is-leading .candidate-stack-leader-badge,
+.candidate-stack.is-winner .candidate-stack-leader-badge {
   visibility: visible;
 }
 
 .candidate-stack.is-leading .candidate-stack-bar {
   border-color: #d19f00;
   box-shadow: 0 0 0 3px #ffd447;
+  transition:
+    border-color 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+
+/*
+ * A round's leader isn't necessarily the eventual winner (that's the whole
+ * point of the IRV recount) -- the winner treatment needs to read as more
+ * final/emphatic than "leading" without introducing a new hue that could be
+ * mistaken for a candidate's own colour, so it doubles the same gold ring
+ * rather than picking a different colour.
+ */
+.candidate-stack.is-winner .candidate-stack-bar {
+  border-color: #d19f00;
+  box-shadow:
+    0 0 0 3px #ffd447,
+    0 0 0 6px rgb(255 212 71 / 35%);
   transition:
     border-color 0.2s ease-out,
     box-shadow 0.2s ease-out;
@@ -447,7 +688,7 @@ main > section:not(.chapter) > p {
 }
 
 .ballot-paper-full {
-  width: 12rem;
+  width: 14rem;
   padding: 0.75rem 1rem;
   font-size: 0.9rem;
   background: var(--colour-surface);
@@ -468,54 +709,70 @@ main > section:not(.chapter) > p {
   border-bottom: 1px solid var(--colour-hairline);
 }
 
+.ballot-paper-instructions {
+  margin: 0.5rem 0;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--colour-ink-muted);
+}
+
 .ballot-paper-ranking {
-  padding-left: 1.25rem;
+  padding-left: 0;
   margin: 0;
-}
-
-ul.ballot-paper-ranking {
-  padding-left: 0;
   list-style: none;
-}
-
-ol.ballot-paper-ranking {
-  padding-left: 0;
-  list-style: none;
-  counter-reset: ballot-rank;
 }
 
 .ballot-paper-ranking li {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.15rem 0;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
 }
 
-ol.ballot-paper-ranking li::before {
-  counter-increment: ballot-rank;
-  content: counter(ballot-rank) ".";
-}
-
-.ballot-paper-checkbox {
+.ballot-paper-checkbox,
+.ballot-paper-number-box {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
   flex-shrink: 0;
-  width: 0.9rem;
-  height: 0.9rem;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
   background: var(--colour-surface);
-  border: 1px solid var(--colour-ink-muted);
+  border: 1.5px solid var(--colour-ink-muted);
   border-radius: 0.15rem;
 }
 
-.ballot-paper-checkbox-checked::after {
-  content: "\2713";
+.ballot-paper-mark {
+  width: 1.1rem;
+  height: 1.1rem;
+  overflow: visible;
+}
+
+.ballot-paper-mark path {
+  fill: none;
+  stroke: var(--colour-ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  /* Progressive-enhancement default: fully drawn. ballot-marks.ts only sets
+   * a dasharray/dashoffset (via inline style, once it has a real path
+   * length to animate from) right before it plays the draw-in animation, so
+   * a slow script or missing Element.animate never leaves a mark invisible. */
+  stroke-dashoffset: 0;
+}
+
+.sr-only {
   position: absolute;
-  top: -0.2rem;
-  left: 0.1rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--colour-ink);
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .ballot-paper-mini {
