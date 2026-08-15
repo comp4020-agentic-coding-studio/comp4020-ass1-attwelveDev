@@ -164,15 +164,29 @@ export function initBallotDrift(
     );
   }
 
-  function fadeHero(hero: HTMLElement, targetOpacity: 0 | 1): void {
+  function fadeHeroOut(hero: HTMLElement): void {
     if (reducedMotion || typeof hero.animate !== "function") {
-      hero.style.opacity = String(targetOpacity);
+      hero.style.opacity = "0";
       return;
     }
-    hero.animate(
-      [{ opacity: targetOpacity === 0 ? 1 : 0 }, { opacity: targetOpacity }],
-      { duration: HERO_FADE_DURATION_MS, fill: "forwards" },
-    );
+    hero.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: HERO_FADE_DURATION_MS,
+      fill: "forwards",
+    });
+  }
+
+  // The clone lands in the exact same position/shape the real hero occupies
+  // at rest, so the moment it's removed there is nothing left to fade from —
+  // an animated fade-in here would hold a visible blank gap (the clone
+  // already gone, the hero still transparent) for no reason. Cancelling any
+  // held fade-out animation first matters because WAAPI's fill: "forwards"
+  // keeps that animation's opacity: 0 in effect over a plain style write
+  // otherwise.
+  function revealHeroInstantly(hero: HTMLElement): void {
+    if (typeof hero.getAnimations === "function") {
+      for (const animation of hero.getAnimations()) animation.cancel();
+    }
+    hero.style.opacity = "1";
   }
 
   function fillRectFor(id: string): DOMRect | undefined {
@@ -248,11 +262,22 @@ export function initBallotDrift(
 
   targetRoot.addEventListener("input", clearSwarm, { once: true });
 
+  // Whether the reader has actually scrolled the target section (the hero's
+  // landing spot) into view at some point. When the hero lives in its own
+  // separate intro chapter, its own IntersectionObserver regaining
+  // "intersecting" only means the reader scrolled back up to *that* chapter
+  // — it says nothing about whether they ever reached the section the hero
+  // flew into, so flyBackward gates on this too. Same-root callers (hero and
+  // target sharing one chapter) have no separate section to visit, so this
+  // starts satisfied for them.
+  let targetVisited = heroRoot === targetRoot || heroRoot === null;
+
   if (typeof view.IntersectionObserver === "function") {
     const swarmObserver = new view.IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
+            targetVisited = true;
             placeSwarm();
             swarmObserver.disconnect();
           }
@@ -266,6 +291,7 @@ export function initBallotDrift(
     );
     swarmObserver.observe(container);
   } else {
+    targetVisited = true;
     placeSwarm();
   }
 
@@ -410,13 +436,13 @@ export function initBallotDrift(
     if (heroFlight?.animation !== animation) return;
     chip.remove();
     heroFlight = null;
-    if (!heroAway) fadeHero(hero!, 1);
+    if (!heroAway) revealHeroInstantly(hero!);
   }
 
   async function flyForward(): Promise<void> {
     if (heroAway) return;
     heroAway = true;
-    fadeHero(hero!, 0);
+    fadeHeroOut(hero!);
 
     let chip: HTMLElement;
     let naturalSize: { width: number; height: number };
@@ -453,7 +479,7 @@ export function initBallotDrift(
   }
 
   async function flyBackward(): Promise<void> {
-    if (!heroAway) return;
+    if (!heroAway || !targetVisited) return;
     heroAway = false;
 
     let chip: HTMLElement;
@@ -498,7 +524,7 @@ export function initBallotDrift(
     // the instant, no-transition feel reduced motion promises elsewhere.
     // completeHeroFlight (below, after the flight settles) will also try
     // this reveal, but it's a no-op the second time.
-    if (!animation) fadeHero(hero!, 1);
+    if (!animation) revealHeroInstantly(hero!);
 
     await finished;
     completeHeroFlight(chip, animation);
