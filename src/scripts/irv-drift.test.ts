@@ -273,6 +273,80 @@ describe("initIrvDrift", () => {
     }
   });
 
+  it("lands a receiving candidate's chips at progressively higher points as the batch arrives, from near its pre-transfer fill height up to its final height -- not all converging on one fixed spot", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
+    );
+    const { window } = dom;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    const animateSpy = vi.fn();
+    window.HTMLElement.prototype.animate = animateSpy;
+
+    // Mirrors irv-app.ts's render() growing "a"'s fill the instant the click
+    // is handled: its top-of-fill sits lower (392, a shorter bar) before the
+    // click and higher (200, a taller bar) after -- the same collapse-style
+    // rect swap the existing capture-order test above already uses, just for
+    // a receiving candidate growing instead of the eliminated one shrinking.
+    let grown = false;
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this.getAttribute("data-fill-for") === "a") {
+        return grown ? rect(200, 300, 40, 240) : rect(392, 300, 40, 40);
+      }
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 40);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0, 14, 19);
+    };
+    const root = window.document.querySelector("section")!;
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .addEventListener("click", () => {
+        grown = true;
+      });
+
+    initIrvDrift(root, threeCandidateScenario());
+    clickNext(root);
+
+    const flightCalls = animateSpy.mock.calls.filter((call) =>
+      "transform" in (call[0] as Array<Record<string, unknown>>)[0],
+    );
+    expect(flightCalls.length).toBeGreaterThan(1);
+
+    const landingYs = flightCalls.map((call) => {
+      const frames = call[0] as Array<{ transform: string }>;
+      const match = /,\s*(-?\d+(?:\.\d+)?)px\)/.exec(
+        frames[frames.length - 1].transform,
+      )!;
+      return Number(match[1]);
+    });
+
+    // Each successive chip lands higher up (a smaller y) than the last,
+    // ending at the final (post-growth) top-of-fill position -- a visible
+    // climb, not every chip converging on one already-final spot.
+    for (let i = 1; i < landingYs.length; i++) {
+      expect(landingYs[i]).toBeLessThan(landingYs[i - 1]);
+    }
+    expect(Math.max(...landingYs)).toBeLessThan(392);
+    // The spring's sampled last keyframe asymptotically approaches its target
+    // rather than landing on it exactly, so allow a couple of pixels' slack
+    // rather than asserting bit-for-bit equality with 200.
+    expect(Math.abs(Math.min(...landingYs) - 200)).toBeLessThan(2);
+
+    // Landing times spread across the window too, instead of every chip
+    // finishing at the same instant despite departing at different times.
+    const landTimes = flightCalls.map((call) => {
+      const options = call[1] as { delay?: number; duration: number };
+      return (options.delay ?? 0) + options.duration;
+    });
+    const uniqueLandTimes = new Set(landTimes.map((t) => Math.round(t)));
+    expect(uniqueLandTimes.size).toBeGreaterThan(1);
+    for (const t of landTimes) {
+      expect(t).toBeLessThanOrEqual(600);
+    }
+  });
+
   it("captures the eliminated candidate's fill geometry before any other click listener can collapse it", () => {
     const dom = new JSDOM(
       `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
