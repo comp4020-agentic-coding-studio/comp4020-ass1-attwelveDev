@@ -36,14 +36,15 @@ function markup(ids: string[]): string {
   return `<section>${stacks}<p data-testid="round-status"></p><p data-testid="winner"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
 }
 
-function setUp(reducedMotion = false) {
+function setUp(reducedMotion = false, scenarioOverride: Scenario = scenario) {
+  const ids = scenarioOverride.candidates.map((c) => c.id);
   const dom = new JSDOM(
-    `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
+    `<!doctype html><html><body>${markup(ids)}</body></html>`,
   );
   const { window } = dom;
   window.matchMedia = vi.fn().mockReturnValue({ matches: reducedMotion });
   const root = window.document.querySelector("section")!;
-  initIrvApp(root, scenario);
+  initIrvApp(root, scenarioOverride);
   return root;
 }
 
@@ -244,5 +245,45 @@ describe("initIrvApp", () => {
       leaderStack.querySelector(".candidate-stack-leader-badge")!
         .textContent,
     ).toBe("Leading");
+  });
+
+  it("names a round 1 tie for the lead in the round-status text", () => {
+    const tiedLeadScenario: Scenario = {
+      candidates: candidates(["a", "b", "c"]),
+      groups: [
+        { ranking: ["a", "b", "c"], count: 50 },
+        { ranking: ["b", "a", "c"], count: 50 },
+        { ranking: ["c", "a", "b"], count: 0 },
+      ],
+    };
+    const root = setUp(false, tiedLeadScenario);
+
+    expect(
+      root.querySelector('[data-testid="round-status"]')!.textContent,
+    ).toBe(
+      "Round 1: A is leading. Tied with B on votes — ties are broken alphabetically by name.",
+    );
+  });
+
+  it("names an elimination tie in the round-status text", () => {
+    const tiedEliminationScenario: Scenario = {
+      candidates: candidates(["a", "b", "c"]),
+      groups: [
+        { ranking: ["a", "b", "c"], count: 50 },
+        { ranking: ["b", "a", "c"], count: 25 },
+        { ranking: ["c", "a", "b"], count: 25 },
+      ],
+    };
+    const root = setUp(false, tiedEliminationScenario);
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .click();
+
+    expect(
+      root.querySelector('[data-testid="round-status"]')!.textContent,
+    ).toBe(
+      "Round 2: C is eliminated. Tied with B on fewest votes — ties are broken alphabetically by name.",
+    );
   });
 });

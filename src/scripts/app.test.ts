@@ -138,4 +138,16 @@ describe("initApp scoping", () => {
       ),
     ).toBe(true);
   });
+
+  it("names a tie for the lead in the winner banner", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${section(["a", "b"])}</body></html>`,
+    );
+    const root = dom.window.document.querySelector("section")!;
+    initApp(root, scenarioFor(["a", "b"], [50, 50]));
+
+    expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
+      "a is currently ahead. Tied with b on votes — ties are broken alphabetically by name.",
+    );
+  });
 });

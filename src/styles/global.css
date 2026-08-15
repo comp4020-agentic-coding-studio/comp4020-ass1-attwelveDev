@@ -709,6 +709,16 @@ main > section:not(.chapter) > p {
   color: var(--colour-ink-muted);
 }
 
+/* Standing disclosure of the tie-break rule, always visible next to the
+ * winner banner in sections where a reader can drive candidates to an
+ * exact tie -- chrome, not data, so it takes the muted ink and stays
+ * clearly secondary to the banner it follows. */
+.tie-footnote {
+  margin-top: var(--space-3xs);
+  font-size: 0.8125rem;
+  color: var(--colour-ink-muted);
+}
+
 .freeplay-ranking {
   display: flex;
   flex-direction: column;

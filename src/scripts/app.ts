@@ -1,4 +1,4 @@
-import { ariaValueText } from "../lib/format";
+import { ariaValueText, tieNote, tiedCandidateIds } from "../lib/format";
 import { redistribute } from "../lib/redistribute";
 import { tallyFptp } from "../lib/tally-fptp";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
@@ -93,7 +93,10 @@ export function initApp(root: ParentNode, scenario: Scenario): void {
 
     const winnerCandidate = candidatesById.get(winner);
     if (winnerEl && winnerCandidate) {
-      winnerEl.textContent = `${winnerCandidate.label} is currently ahead.`;
+      const tiedLabels = tiedCandidateIds(counts, winner).map(
+        (id) => candidatesById.get(id)!.label,
+      );
+      winnerEl.textContent = `${winnerCandidate.label} is currently ahead.${tieNote(tiedLabels, "votes")}`;
     }
   }
 

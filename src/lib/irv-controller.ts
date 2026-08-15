@@ -1,3 +1,4 @@
+import { tiedCandidateIds } from "./format";
 import { tallyIrv, type IrvRound } from "./tally-irv";
 import type { CandidateId, Scenario } from "./types";
 
@@ -11,6 +12,7 @@ export interface IrvController {
   readonly isFinal: boolean;
   readonly winner: CandidateId | null;
   readonly justEliminated: CandidateId | null;
+  readonly justEliminatedTiedWith: CandidateId[];
   readonly justTransfers: Record<CandidateId, number> | null;
   next(): boolean;
   prev(): boolean;
@@ -38,6 +40,16 @@ export function createIrvController(scenario: Scenario): IrvController {
     // current round lives on the previous round, not this one.
     get justEliminated() {
       return roundIndex > 0 ? rounds[roundIndex - 1].eliminated : null;
+    },
+    // Who the just-eliminated candidate was actually tied with for fewest
+    // votes, before pickElimination's deterministic tie-break picked them —
+    // read off the previous round's counts, the same round that recorded
+    // the elimination itself.
+    get justEliminatedTiedWith() {
+      const previous = roundIndex > 0 ? rounds[roundIndex - 1] : null;
+      return previous?.eliminated
+        ? tiedCandidateIds(previous.counts, previous.eliminated)
+        : [];
     },
     get justTransfers() {
       const previous = roundIndex > 0 ? rounds[roundIndex - 1] : null;

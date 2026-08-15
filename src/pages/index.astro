@@ -101,6 +101,10 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
             }
           </div>
           <p data-testid="winner" aria-live="polite"></p>
+          <p class="tie-footnote">
+            If two candidates end up exactly tied, the tie is broken
+            alphabetically by candidate name.
+          </p>
         </div>
       </section>
 
@@ -289,6 +293,11 @@ import { strategicBallot } from "../data/sample-ballot-strategic";
         <div id="freeplay-app">
           <div class="candidate-columns" data-freeplay-columns></div>
           <p data-testid="winner" aria-live="polite"></p>
+          <p class="tie-footnote">
+            If two candidates end up exactly tied — on first-preference
+            votes, or on fewest votes during an instant-runoff round — the
+            tie is broken alphabetically by candidate name.
+          </p>
           <div class="freeplay-controls">
             <button type="button" data-action="add-candidate">
               Add candidate

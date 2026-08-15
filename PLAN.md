@@ -1458,6 +1458,54 @@ Checks:
   and re-ran the scripted section's own single-elimination case forward and
   back to confirm no regression there.
 
+## Feature: disclose the tie-break rule wherever a tie is actually broken
+
+A reader hit a genuine exact tie in free play (two candidates left, 500
+votes each) and watched the recount silently pick a winner with no
+explanation. `tallyFptp`/`tallyIrv` already break ties deterministically
+(the candidate whose id sorts lower wins/survives) precisely so scenarios
+stay reproducible and testable — confirmed with the user that the rule
+itself should stay, but the page must say so explicitly whenever a tie is
+actually the reason for an outcome.
+
+- Shared helpers in `src/lib/format.ts`: `tiedCandidateIds(counts,
+  outcomeId)` returns the other candidate ids sharing that exact count;
+  `tieNote(tiedLabels, onWhat)` returns `""` when untied, otherwise a
+  sentence fragment naming who it was tied with and that ties are broken
+  alphabetically by name. Both covered by `src/lib/format.test.ts`.
+- Four call sites reuse these: the FPTP explore winner banner (`app.ts`),
+  the free-play winner banner (`freeplay-app.ts`, both FPTP and IRV
+  modes), and IRV's round-status text for both the round-1 leader and an
+  elimination (`irv-app.ts`), the latter needing a new
+  `IrvController.justEliminatedTiedWith` getter (`irv-controller.ts`) to
+  reach the previous round's counts.
+- Two standing footnotes, static prose in `index.astro` right after the
+  winner `<p>` in the explore and free-play sections (the only two
+  sections a reader can actually drive to a tie), styled by a new
+  `.tie-footnote` rule in `global.css` — muted, small print, clearly
+  secondary to the winner banner. The scripted recount section uses a
+  fixed, tie-free scenario, so it gets no footnote.
+- Out of scope: no change to the tie-break rule itself or to
+  `tallyFptp`/`tallyIrv`'s return types; no duplicate note on the
+  per-candidate stack badges; no on-page copy about real-world tie-break
+  practice (coin flips, by-elections) — already covered directly with the
+  user, not requested as on-page content.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 176
+  tests passing, including new coverage in `format.test.ts`,
+  `irv-controller.test.ts`, and `irv-app.test.ts` for tied and untied
+  cases.
+- **Manual browser pass** (`pnpm preview`, both marking viewports):
+  reproduced the reported scenario in free play (drove two candidates to
+  500/500 in IRV mode) and confirmed the round-status text names the tie
+  and the rule at the moment one is eliminated; also drove the FPTP
+  explore section and the IRV round-1 leading indicator to a tie via the
+  sliders and confirmed each shows the note. Confirmed `aria-live` still
+  announces the fuller sentence sensibly, the added text doesn't overflow
+  or wrap awkwardly at 390×844, and the two standing footnotes read as
+  clearly-secondary small print at both viewports.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice

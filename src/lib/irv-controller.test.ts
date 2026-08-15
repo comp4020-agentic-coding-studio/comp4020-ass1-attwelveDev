@@ -33,6 +33,7 @@ describe("createIrvController", () => {
     expect(controller.isFinal).toBe(false);
     expect(controller.winner).toBeNull();
     expect(controller.justEliminated).toBeNull();
+    expect(controller.justEliminatedTiedWith).toEqual([]);
     expect(controller.justTransfers).toBeNull();
   });
 
@@ -45,7 +46,25 @@ describe("createIrvController", () => {
     expect(controller.isFinal).toBe(true);
     expect(controller.winner).toBe("a");
     expect(controller.justEliminated).toBe("c");
+    expect(controller.justEliminatedTiedWith).toEqual([]);
     expect(controller.justTransfers).toEqual({ a: 25 });
+  });
+
+  it("reports who the just-eliminated candidate was tied with", () => {
+    const scenario: Scenario = {
+      candidates: candidates(["a", "b", "c"]),
+      groups: [
+        { ranking: ["a", "b", "c"], count: 50 },
+        { ranking: ["b", "a", "c"], count: 25 },
+        { ranking: ["c", "a", "b"], count: 25 },
+      ],
+    };
+    const controller = createIrvController(scenario);
+    controller.next();
+    // b and c are tied for fewest (25 each); the tie-break eliminates c —
+    // the higher id, consistently with tallyIrv's own tie-break rule.
+    expect(controller.justEliminated).toBe("c");
+    expect(controller.justEliminatedTiedWith).toEqual(["b"]);
   });
 
   it("won't advance past the final round", () => {

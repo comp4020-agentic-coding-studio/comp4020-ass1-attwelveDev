@@ -1,3 +1,4 @@
+import { tieNote, tiedCandidateIds } from "../lib/format";
 import { createIrvController } from "../lib/irv-controller";
 import { tallyFptp } from "../lib/tally-fptp";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
@@ -100,10 +101,24 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
         ? candidatesById.get(controller.justEliminated)
         : null;
       const leaderCandidate = leader ? candidatesById.get(leader) : null;
+      const eliminatedTie = tieNote(
+        controller.justEliminatedTiedWith.map(
+          (id) => candidatesById.get(id)!.label,
+        ),
+        "fewest votes",
+      );
+      const leaderTie = leader
+        ? tieNote(
+            tiedCandidateIds(round.counts, leader).map(
+              (id) => candidatesById.get(id)!.label,
+            ),
+            "votes",
+          )
+        : "";
       statusEl.textContent = eliminatedCandidate
-        ? `Round ${roundNumber}: ${eliminatedCandidate.label} is eliminated.`
+        ? `Round ${roundNumber}: ${eliminatedCandidate.label} is eliminated.${eliminatedTie}`
         : leaderCandidate
-          ? `Round ${roundNumber}: ${leaderCandidate.label} is leading.`
+          ? `Round ${roundNumber}: ${leaderCandidate.label} is leading.${leaderTie}`
           : `Round ${roundNumber}.`;
     }
 

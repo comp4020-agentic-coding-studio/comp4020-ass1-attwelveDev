@@ -88,6 +88,14 @@ describe("initFreeplayApp", () => {
     ).toContain("A");
   });
 
+  it("names a tie in the winner banner when two candidates end up level", () => {
+    const { root } = setUp(2);
+
+    expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
+      "A is currently ahead. Tied with B on votes — ties are broken alphabetically by name.",
+    );
+  });
+
   it("pairs each candidate's stack and slider inside one shared candidate-column", () => {
     const { root } = setUp(3);
     const stack = root.querySelector('[data-candidate="a"]')!;

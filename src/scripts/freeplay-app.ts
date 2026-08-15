@@ -1,4 +1,4 @@
-import { ariaValueText } from "../lib/format";
+import { ariaValueText, tieNote, tiedCandidateIds } from "../lib/format";
 import {
   addCandidate,
   moveRankingEntry,
@@ -275,7 +275,10 @@ export function initFreeplayApp(root: ParentNode, scenario: Scenario): void {
       winnerEl.hidden = mode === "irv";
       const winnerCandidate = state.candidates.find((c) => c.id === winner);
       if (winnerCandidate) {
-        winnerEl.textContent = `${winnerCandidate.label} is currently ahead.`;
+        const tiedLabels = tiedCandidateIds(state.counts, winner).map(
+          (id) => state.candidates.find((c) => c.id === id)!.label,
+        );
+        winnerEl.textContent = `${winnerCandidate.label} is currently ahead.${tieNote(tiedLabels, "votes")}`;
       }
     }
   }
