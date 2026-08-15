@@ -414,11 +414,67 @@ describe("initBallotDrift", () => {
     // revealing the real hero already would show both on screen at once.
     expect(heroFadeCalls()).toBe(1);
 
-    await vi.waitFor(() => {
-      expect(heroFadeCalls()).toBe(2);
-    });
+    // Once the clone lands it's removed and the two are visually
+    // coincident, so the hero should reappear as an instant cut -- no
+    // second .animate() call on the hero, just the style flipping straight
+    // to visible.
     await vi.waitFor(() => {
       expect(targetRoot.querySelector("[data-hero-ballot-chip]")).toBeNull();
+    });
+    expect(hero.style.opacity).toBe("1");
+    expect(heroFadeCalls()).toBe(1);
+  });
+
+  it("does not fly the hero back until the target section it flew into has actually been visited", () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window, animateSpy } = setUp(false, {
+      hero: true,
+      separateHeroSection: true,
+    });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+
+    heroObserver.trigger(hero, true);
+    heroObserver.trigger(hero, false);
+    expect(targetRoot.querySelector("[data-hero-ballot-chip]")).not.toBeNull();
+
+    // Scrolling back up to the hero's own (intro) chapter regaining
+    // visibility isn't the same as having reached the section it flew
+    // into -- without that visit, flying it back would be premature.
+    const callsBefore = animateSpy.mock.calls.length;
+    heroObserver.trigger(hero, true);
+    expect(animateSpy.mock.calls.length).toBe(callsBefore);
+    expect(targetRoot.querySelector("[data-hero-ballot-chip]")).not.toBeNull();
+  });
+
+  it("flies the hero back once it re-enters view, as long as the target section has genuinely been visited at some point", async () => {
+    const { FakeObserver, instances } = fakeIntersectionObserver();
+    const { heroRoot, targetRoot, window } = setUp(false, {
+      hero: true,
+      separateHeroSection: true,
+    });
+    window.IntersectionObserver =
+      FakeObserver as unknown as typeof IntersectionObserver;
+
+    initBallotDrift(heroRoot, targetRoot, scenario());
+    const hero = heroRoot.querySelector<HTMLElement>("[data-hero-ballot]")!;
+    const heroObserver = observerFor(instances, hero);
+    const container = targetRoot.querySelector<HTMLElement>(
+      "[data-ballot-drift]",
+    )!;
+    const swarmObserver = observerFor(instances, container);
+
+    heroObserver.trigger(hero, true);
+    heroObserver.trigger(hero, false);
+    swarmObserver.trigger(container, true);
+
+    heroObserver.trigger(hero, true);
+    await vi.waitFor(() => {
+      expect(hero.style.opacity).toBe("1");
     });
   });
 
