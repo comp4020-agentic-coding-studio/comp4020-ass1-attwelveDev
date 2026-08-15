@@ -79,6 +79,29 @@ function allocateTransferChips(
   return allocation;
 }
 
+// A receiving candidate's [data-fill-for] element sits inside a fixed-height
+// bar (position: relative, no transition of its own) as an absolutely
+// positioned child anchored to the bar's bottom edge (bottom: 0; height:
+// var(--fill-pct)). irv-app.ts puts a CSS transition on that height, so the
+// fill's own getBoundingClientRect() lags behind its just-set --fill-pct
+// value for the length of the transition -- reading it synchronously right
+// after the value changes still reports the *old* box. The bar itself never
+// moves, so its rect plus the freshly-set (and, unlike the box, immediately
+// current) --fill-pct percentage gives the true final top independent of how
+// far the visual transition has progressed. Returns undefined if the fill has
+// no parent or an unparseable --fill-pct, so the caller can fall back.
+function computeFinalFillTop(
+  fill: HTMLElement | null,
+  containerRect: DOMRect,
+): number | undefined {
+  const bar = fill?.parentElement;
+  if (!bar) return undefined;
+  const pct = Number.parseFloat(fill.style.getPropertyValue("--fill-pct"));
+  if (Number.isNaN(pct)) return undefined;
+  const barRect = bar.getBoundingClientRect();
+  return barRect.bottom - barRect.height * (pct / 100) - containerRect.top;
+}
+
 // Wires the IRV recount section's own drift animation: on a next() that just
 // eliminated someone, spawns a small sample of mini ballot-paper chips flying
 // from the eliminated candidate's stack to each receiving candidate's stack,
@@ -187,18 +210,28 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
       );
       const targetRect = target?.getBoundingClientRect();
       const toX = (targetRect?.left ?? containerRect.left) - containerRect.left;
-      const finalToY =
-        (targetRect?.top ?? containerRect.top) - containerRect.top;
 
       // By the time this runs, irv-app.ts's own render() (an earlier
-      // bubble-phase listener on the same click) has already grown this
-      // receiving stack to its final height — there's no CSS transition on
-      // .candidate-stack-fill to catch mid-grow, so every chip converging on
-      // that one, already-final point reads as feeding into the middle of an
-      // already-tall bar rather than building it up. Landing each successive
-      // chip progressively higher — interpolated between where the fill's
-      // top edge sat *before* this transfer and where it ends up — makes
-      // each arrival read as adding to the top of a still-growing stack.
+      // bubble-phase listener on the same click) has already set this
+      // receiving stack's --fill-pct to its final value — but irv-app.ts
+      // also puts a 600ms CSS transition on .candidate-stack-fill's height,
+      // so target.getBoundingClientRect() still reports the *pre-transition*
+      // box at this synchronous read (the used value hasn't caught up to
+      // the new specified value yet). Reading finalToY from that live rect
+      // would make every chip converge on the stack's *old* height, not its
+      // new one. Its parent bar (fixed height, untouched by the transition)
+      // plus the freshly-set --fill-pct percentage gives the true final top
+      // instead, independent of how far the visual transition has progressed.
+      const fallbackToY =
+        (targetRect?.top ?? containerRect.top) - containerRect.top;
+      const finalToY =
+        computeFinalFillTop(target, containerRect) ?? fallbackToY;
+
+      // Landing each successive chip progressively higher — interpolated
+      // between where the fill's top edge sat *before* this transfer and
+      // where it ends up — makes each arrival read as adding to the top of
+      // a still-growing stack, rather than feeding into the middle of an
+      // already-tall one.
       const startToY = preClickFillRects.get(id)?.top;
       const fromToY = startToY !== undefined
         ? startToY - containerRect.top
