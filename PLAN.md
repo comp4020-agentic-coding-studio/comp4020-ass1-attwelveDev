@@ -18,31 +18,45 @@ partisan. Kept to one mechanic reused twice, not two separate explainers.
 
 ## Structure
 
-1. **How FPTP works.** Reader sees a simulated ballot paper (a full ranked
+1. **Introduction.** A short framing section ahead of any mechanic: states the
+   stakes (the counting rule, not just the votes, can decide who wins) before
+   asking the reader to learn anything, and assumes no background beyond
+   knowing what a ballot paper is.
+2. **How FPTP works.** Reader sees a simulated ballot paper (a full ranked
    preference order) and, on scroll, watches it drift and land on one of three
    stacks — the candidate it ranked first. Stacks double as the bar chart.
    Sliders (one per candidate, native `<input type="range">`, redistributing
    the remaining pool proportionally) let the reader freely explore outcomes.
-2. **Transition to the flaw.** The story pivots from free exploration to one
+3. **Transition to the flaw.** The story pivots from free exploration to one
    authored, hand-tuned scenario that reliably produces a spoiler-effect
    result — vote splitting between two similar candidates hands the win to a
    less-preferred third. This authored scenario (not whatever the reader left
    the sliders at) is what carries forward into the IRV recount.
-3. **The flaws.**
+4. **The flaws.**
    - *Spoiler effect* — primary, fully interactive, demonstrated on the
-     authored scenario.
+     authored scenario. Named as a term ("the spoiler effect"), not just
+     narrated, so the reader leaves with the vocabulary as well as the idea.
    - *Strategic voting* — shown via one or two of the sampled ballot papers:
      the voter's sincere ranking vs. the vote they'd need to cast tactically
      under FPTP.
    - *Two-party convergence (Duverger's law)* — one text paragraph, no new
      visualisation. It's a claim about many elections over time, not this one
      scenario, so it doesn't get a second mechanic.
-4. **How IRV works, recounting the same election.** Same ballot-paper objects,
+5. **Transition to IRV.** A hinge, not a scene break: names what just went
+   wrong under FPTP, then names the fix — preferential voting, also called
+   instant-runoff voting or IRV — before its ballot mechanic is shown, so the
+   switch in system reads as the next beat of one story rather than a second,
+   disconnected explainer starting cold.
+6. **How IRV works, recounting the same election.** Same ballot-paper objects,
    same stacks. Last-place candidate is eliminated and those ballots drift to
    their next preference's stack. With 3 candidates this is at most one
    elimination round. Reader watches the spoiler resolve.
-5. **Takeaway + free play.** A closing line, then a free-play mode: the reader
-   can add or remove candidates and freely adjust votes, no scripted outcome.
+7. **Conclusion.** A closing section stating the takeaway plainly and tying it
+   back to the introduction's framing and the page's own title question — same
+   votes, different winner, because the counting rule changed — before free
+   play opens up as an epilogue rather than doubling as the ending by default.
+8. **Free play.** No scripted outcome: the reader can add or remove candidates
+   and freely adjust votes.
 
 ## Feature: ballot-mechanics intro chapters
 
@@ -611,6 +625,40 @@ Checks:
   spread across a real ~50px range (219.5 → 163.6 for one batch observed),
   spread across the full 0–600ms window, instead of collapsing to one
   identical value as they did before this fix.
+
+## Feature: an introduction, a conclusion, and an explicit FPTP → IRV hinge
+
+`CLAUDE.md` gained a standing convention ("The site is one story, not two
+feature demos") requiring a real introduction with motivation for a reader
+with no voting/politics background, a real conclusion with takeaways, and a
+transition between the two systems that reads as one continuous story rather
+than two separate demos. Auditing the actual copy in `index.astro` against
+that bar found four gaps: no framing section before the FPTP mechanic starts,
+no closing section after the IRV recount (free play was serving as the
+ending by default), the spoiler effect was narrated but never named as a
+term, and the FPTP → IRV switch happened as a bare section change with no
+sentence explaining what was about to happen or why.
+
+Fixed by adding two new plain (non-`.chapter`) sections — an introduction
+right after the `<h1>` and a conclusion right after the IRV recount, before
+free play — following the same heading+paragraph pattern already used by the
+Duverger's-law and free-play sections. The spoiler section's prose and
+heading now name "the spoiler effect" explicitly instead of only describing
+the mechanic. The IRV ballot-intro section's opening sentence now names both
+what just went wrong under FPTP and the fix ("preferential voting — also
+called instant-runoff voting, or IRV") before describing the new ballot,
+so naming and mechanic don't arrive in separate breaths.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — this
+  is a content-only change, no markup structure or script behaviour changed
+  in a way any existing test asserts against.
+- Manual browser pass at both 1920×1080 and 390×844 confirmed the new
+  sections render in the right place in the scroll order, read correctly
+  cold (per `CLAUDE.md`'s "read it cold before calling a section done"
+  check), and that the conclusion sits directly before free play rather than
+  free play remaining the de facto ending.
+
 
 ## Data model
 
