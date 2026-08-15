@@ -574,6 +574,21 @@ export function initBallotDrift(
 
   view.addEventListener("scroll", retargetActiveFlight);
 
+  // Crossing out of the band's *top* edge means the reader scrolled further
+  // down, away from the hero and on toward its landing target — the one
+  // case flyForward should fire for. Crossing out through the *bottom* edge
+  // means the opposite: the reader scrolled back up, away from the hero and
+  // toward earlier content, which should leave an already-home hero exactly
+  // where it is. `entry.isIntersecting` alone can't distinguish these (it
+  // only says "inside the band or not"), so without this check, scrolling
+  // up past the hero (to reread the section above it) wrongly replayed the
+  // fade-out/fly-away as if the reader were moving on toward the target,
+  // leaving the hero invisible until its section scrolled back into focus.
+  function heroExitedThroughTop(entry: IntersectionObserverEntry): boolean {
+    if (!entry.rootBounds) return true;
+    return entry.boundingClientRect.bottom <= entry.rootBounds.top;
+  }
+
   if (typeof view.IntersectionObserver === "function") {
     let hasObservedHero = false;
     const heroObserver = new view.IntersectionObserver(
@@ -587,7 +602,7 @@ export function initBallotDrift(
             continue;
           }
           if (entry.isIntersecting) void flyBackward();
-          else void flyForward();
+          else if (heroExitedThroughTop(entry)) void flyForward();
         }
       },
       // Without a margin, threshold: 0 fires the instant either edge of the

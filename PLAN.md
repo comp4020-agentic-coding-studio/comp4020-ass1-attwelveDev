@@ -780,6 +780,51 @@ Checks:
   confirmed both card variants read as one consistent left-aligned style with
   visible padding on all sides at both viewport sizes.
 
+## Feature: the hero ballot forgot which way the reader was scrolling
+
+Reported bug: the hero ballot (`#fptp-ballot-intro`/`#irv-ballot-intro`) played
+correctly the first time a reader scrolled down through the page, but on any
+later visit it went invisible while the *previous* section was in focus, then
+visibly flew in from below only once its own section came back into view —
+exactly the fly-in the reader should only ever see once.
+
+Root cause, in `ballot-drift.ts`'s hero `IntersectionObserver`
+(`rootMargin: "-35% 0px -35% 0px"`, the same central-30%-band "has the reader
+really arrived" test the swarm observer uses): its callback treated
+`entry.isIntersecting` as a full forward/backward signal —
+`isIntersecting ? flyBackward() : flyForward()` — but that boolean only says
+whether the hero is inside the band, not which edge it crossed to get there.
+Exiting through the band's *top* edge (scrolling further down, on toward the
+target stacks) and exiting through its *bottom* edge (scrolling back up, away
+from the hero toward earlier content) both report `isIntersecting: false`
+identically. On a first top-to-bottom pass the hero only ever exits through
+the top, so the bug was invisible. On a revisit — scroll up to bring the hero
+back home (correctly re-enters through the bottom → `flyBackward`), then keep
+scrolling up to reread the section above it — the hero now exits through the
+*bottom* edge, and the observer called `flyForward()` regardless, fading the
+already-home hero back out even though the reader was moving away from the
+target, not toward it. Scrolling back down to it again then replayed the
+fly-in, because the flight state had been left in "away."
+
+Fixed by adding `heroExitedThroughTop()`, which reads `entry.boundingClientRect`
+against `entry.rootBounds` to tell the two exits apart, and only calling
+`flyForward()` on a top-edge exit; a bottom-edge exit now does nothing, leaving
+an already-revealed hero exactly as it is.
+
+Checks:
+- `pnpm check` stays green (130 tests) — this is scroll-position logic no
+  existing unit test exercises directly.
+- Manual browser pass (`pnpm preview`, via `agent-browser`) at both marking
+  viewports: scripted `window.scrollTo` through a full
+  down → up-past-the-hero → down-again cycle on both
+  `#fptp-ballot-intro`/`#explore-app` and `#irv-ballot-intro`/`#recount-app`,
+  reading the hero's computed `opacity` at each step. Confirmed the hero now
+  stays visible (`opacity: 1`) the entire way back up past its own section to
+  the one above it, and stays visible scrolling back down again right up until
+  it's actually scrolled past toward its target — no re-trigger, no gap where
+  it's invisible while the section above is in focus. Screenshots at
+  1920×1080 confirm the same visually (ballot paper visible in its card while
+  the prose column shows the section above).
 
 ## Data model
 
