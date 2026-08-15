@@ -1218,6 +1218,38 @@ Checks:
   `getComputedStyle`) and clicking/activating it scrolls to "How the ballot
   works"; no console errors at either viewport.
 
+## Feature: the conclusion closes the loop on the spoiler effect and Duverger's law
+
+The previous introduction/conclusion pass (above, "an introduction, a
+conclusion, and an explicit FPTP → IRV hinge") gave the conclusion a real
+takeaway, but a follow-up question caught two threads it opened earlier
+and never tied off: the spoiler-effect section names that term explicitly,
+and the Duverger's-law section sets up the two-party-convergence problem,
+but the conclusion only described the outcome in generic language ("that
+split gets resolved") without calling back to either by name — exactly the
+kind of dangling thread `CLAUDE.md`'s "close the loop" rule warns against.
+
+Fixed by rewriting the conclusion into three paragraphs instead of one:
+the first now names "the spoiler effect from earlier" directly against
+Cedar's win, rather than re-describing the mechanic in new words. The
+second is new, and deliberately narrow: it ties Duverger's law's
+two-party-convergence pressure to the same sincere-vote-is-risky bind
+Aster/Birch supporters faced, and states that preferential voting removes
+*that specific incentive* — not a claim that IRV eliminates two-party
+politics outright, which the demo doesn't show and the real-world
+evidence doesn't support. The third paragraph keeps the original closing
+line ("The votes never changed. The rules did...") unchanged, since it
+already lands the point cleanly. No test asserts prose content — this is
+a copy-only change, no markup/script structure changed.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — no
+  markup structure changed, only text inside existing `<p>` elements.
+- Read cold, start to finish, per `CLAUDE.md`'s "read it cold" rule: the
+  new second paragraph was checked for overclaiming (it explicitly caveats
+  "won't rebuild a multi-party system on its own") so it doesn't overstate
+  what a three-candidate demo can prove about real electoral systems.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
