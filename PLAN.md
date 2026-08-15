@@ -1506,6 +1506,32 @@ Checks:
   or wrap awkwardly at 390×844, and the two standing footnotes read as
   clearly-secondary small print at both viewports.
 
+## Copy: ground first-past-the-post in real stakes before naming it
+
+The "How the ballot works" chapter dropped the term "first-past-the-post"
+on the reader with no run-up and no reason to care beyond the mechanic
+itself — a "cool demo, but so what?" gap per CLAUDE.md's "open with the
+stakes" rule, since this is the reader's first contact with the term.
+
+- The chapter's opening paragraph now names it explicitly as a voting
+  system — "the voting system we'll look at first" — before describing
+  the mechanic, and grounds it in real stakes: it's how elections are run
+  across the United States, and how the United Kingdom, Canada, and India
+  choose their governments, so a reader from any of those places is very
+  likely looking at how their own vote actually gets counted.
+- Deliberately doesn't claim it's how the US president is elected
+  specifically (that's the Electoral College, a layer on top) — "across
+  the United States" stays accurate to Congressional and state-level
+  races without overclaiming.
+
+Checks:
+- Copy-only change: `pnpm check` stays green (176/176 tests, no code
+  touched).
+- **Manual read-cold pass**: read the new paragraph start to finish as a
+  first-time reader — the term now has a reason to matter before it's
+  used, and the added sentences don't overflow or wrap awkwardly in the
+  narrow prose column at 390×844.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
