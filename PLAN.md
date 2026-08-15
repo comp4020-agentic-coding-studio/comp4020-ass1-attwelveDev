@@ -499,6 +499,75 @@ Checks:
   simultaneous clump; clicking "Next round" repeatedly never leaves stray
   static lines poking out below any stack.
 
+## Feature: instant hero reveal, a real target-visit gate, and chips that climb the stack
+
+A further pass found the previous fixes above were each still one layer
+short of the actual root cause.
+
+- **The hero's reappearance was an animated fade-in, but the clone and the
+  real hero occupy the exact same position/shape at the moment the clone
+  lands — there is nothing to visually fade from.** The `completeHeroFlight`
+  fix above (see the feature entry before this one) correctly delayed the
+  reveal until landing, but still played it as a 400ms `fadeHero(hero, 1)`
+  animation, which reads as a needless flicker since the two are visually
+  coincident at that instant. Split `fadeHero` into `fadeHeroOut` (unchanged
+  fade, still used at flight departure) and a new `revealHeroInstantly`,
+  which cancels any held WAAPI animation (`fill: "forwards"` otherwise keeps
+  the old fade-out's `opacity: 0` in effect over a later plain style write)
+  and sets `opacity: "1"` directly with no animation — an instant cut, not a
+  fade.
+- **The hero still flew back prematurely.** The `rootMargin` fix above
+  (previous feature entry) stopped a *quick edge-peek* from re-triggering
+  the flight, but didn't address the actual case the brief describes: the
+  hero's own chapter regaining visibility on scroll-up is not the same as
+  the reader having actually reached the section the hero flew into — so
+  scrolling from "How preferential ballots work" up past its own top edge
+  (without ever having scrolled down as far as "Recounting the same election
+  under IRV") still flew the hero back too soon. Added a `targetVisited`
+  flag in `ballot-drift.ts`, set the first time the *target* section's own
+  swarm `IntersectionObserver` fires (piggybacking on the existing one-shot
+  observer rather than adding a second one); `flyBackward()` now also checks
+  this flag, so the reverse flight can only fire after a genuine visit to
+  the target section, not merely a revisit of the hero's own chapter.
+- **IRV transfer chips all fed into the same one fixed point on the
+  receiving stack.** The stagger fix above (previous feature entry)
+  spread chip *departures* out, but every chip in a batch still landed at
+  the one, already-final `--fill-pct` position — `.candidate-stack-fill`
+  has no CSS transition, so by the time any chip's flight starts,
+  `irv-app.ts`'s `render()` has already grown the receiver's fill to its
+  full final height in one synchronous step. Converging on that single
+  already-tall point reads as feeding the middle of the bar, not building it
+  up. Fixed by interpolating each chip's landing Y between the receiver's
+  pre-click fill top (from the existing `preClickFillRects` snapshot) and
+  its already-final post-click top, scaled by the chip's position in the
+  batch (`landFraction = (i + 1) / count`), and staggering landing *time*
+  the same way (`landAtMs = landFraction * 600ms`) so later chips both land
+  higher and arrive later — the last chip in a batch still lands exactly at
+  the final top at the end of the 600ms window, but the batch now reads as
+  a climb up the stack rather than one simultaneous convergence.
+
+Checks:
+- `ballot-drift.test.ts` — a rewritten hero test asserts the hero's
+  reappearance is a direct `style.opacity` write with no second `.animate()`
+  call on the hero once its clone lands; two new tests assert `flyBackward`
+  does nothing when the hero's own chapter regains visibility without the
+  target section ever having been visited, and does fire once it has.
+- `irv-drift.test.ts` — a new test mocks a receiving candidate's
+  `[data-fill-for]` rect to grow (shorter before the click, taller after,
+  mirroring `irv-app.ts`'s real `render()`), then asserts each successive
+  chip in that receiver's batch lands strictly higher than the last (down to
+  the final post-growth top, within a couple of pixels for the spring's
+  asymptotic approach) and that landing times spread out rather than all
+  syncing to 600ms.
+- `pnpm astro check` / `pnpm build` — typecheck and build stay clean.
+- Manual browser pass at both marking viewports (`pnpm preview`): the hero's
+  reappearance reads as an instant cut, not a fade; scrolling "How
+  preferential ballots work" back into view without ever having reached
+  "Recounting the same election under IRV" never flies the hero back;
+  stepping through an IRV round shows a receiving candidate's chips visibly
+  climbing to the top of its stack over the course of the transfer, rather
+  than converging on one fixed spot partway up.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
