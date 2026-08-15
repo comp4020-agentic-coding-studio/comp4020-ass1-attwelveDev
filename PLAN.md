@@ -1532,6 +1532,34 @@ Checks:
   used, and the added sentences don't overflow or wrap awkwardly in the
   narrow prose column at 390×844.
 
+## Copy: the explore section claimed voters rank candidates, contradicting the ballot it just showed
+
+The "How first-past-the-post works" chapter opened with "Every voter ranks
+the candidates in order, but under first-past-the-post only a voter's
+first preference is ever counted" — directly after the previous section
+showed a real FPTP ballot with a single tick box. Real FPTP ballots never
+ask for a ranking at all, so this contradicted what the reader had just
+seen, and it front-ran the reveal the IRV pivot section is building
+toward ("*Instead of* ticking one box, number every candidate...").
+
+- Rewritten to describe the mechanic honestly instead: "That single tick
+  is the whole system: count them up, and whoever has the most wins. Try
+  it yourself — drag a candidate's stack and watch who's ahead as votes
+  shift between candidates."
+- Loses the early foreshadowing that voters have preferences beyond their
+  first — deliberately, since that idea already lands cleanly later
+  (the Duverger's-law section, the tactical-vote comparison) without
+  needing to be seeded here, and keeping this section simple matters more
+  than an early hint.
+
+Checks:
+- Copy-only change: `pnpm check` stays green (176/176 tests, no code
+  touched).
+- **Manual read-cold pass**: confirmed the new sentence no longer
+  conflicts with the one-tick ballot shown one section earlier, and reads
+  cleanly as a first-time reader moving straight from that ballot into
+  this interactive demo.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
