@@ -568,6 +568,50 @@ Checks:
   climbing to the top of its stack over the course of the transfer, rather
   than converging on one fixed spot partway up.
 
+## Feature: chips were still converging on one spot — the fill's own rect lags a live CSS transition
+
+The manual browser pass for the feature above caught a bug the progressive-
+climb fix's own unit test couldn't see: in a real browser, every chip in a
+batch still landed at the exact same point, not the climb the test asserted.
+
+Root cause: `irv-app.ts` puts a 600ms CSS transition
+(`fillEl.style.transition = "height 600ms ease"`) on `.candidate-stack-fill`
+so a round change grows the bar smoothly rather than snapping. The
+progressive-climb fix computed a receiving chip's final landing point
+(`finalToY`) from that same fill element's own `getBoundingClientRect()`,
+read synchronously right after `render()` sets the new `--fill-pct`. With a
+live CSS transition in play, that read reports the box's *pre-transition*
+geometry — the used value of `height` hasn't caught up to the freshly-set
+specified value yet — so `finalToY` came out equal to `fromToY` (the
+already-captured pre-click top), collapsing every chip's interpolated
+landing point onto the same spot regardless of `landFraction`. The unit
+test never caught this because its mocked `getBoundingClientRect()` jumps
+straight to the post-growth box on click, with no transition lag to model.
+
+Fixed by no longer trusting the fill element's own rect for the *final*
+position at all: `computeFinalFillTop()` instead reads the stable, non-
+transitioning parent bar's rect (`position: relative`, fixed height, never
+animated) together with the fill's own `--fill-pct` value — a custom
+property, whose *specified* value updates instantly regardless of the
+transition on the derived `height` — and computes
+`barRect.bottom - barRect.height * (pct / 100)` directly. This matches the
+real box the fill will occupy once its transition finishes, independent of
+how far along that transition happens to be at read time.
+
+Checks:
+- `irv-drift.test.ts` — a new test mocks the fill element's rect to stay
+  permanently stuck at its pre-click box (modelling a transition that never
+  visually catches up within the test), while still letting `--fill-pct` be
+  set for real; asserts every chip lands using the bar-geometry calculation
+  (a real climb ending near the value implied by the new `--fill-pct`), not
+  frozen at the stuck rect's top.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green.
+- Manual browser pass: captured the real `.animate()` calls for a "Next
+  round" click's transfer batch and confirmed the landing Y values now
+  spread across a real ~50px range (219.5 → 163.6 for one batch observed),
+  spread across the full 0–600ms window, instead of collapsing to one
+  identical value as they did before this fix.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
