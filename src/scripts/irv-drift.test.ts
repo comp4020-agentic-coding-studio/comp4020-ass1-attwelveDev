@@ -347,6 +347,66 @@ describe("initIrvDrift", () => {
     }
   });
 
+  it("computes a receiving candidate's final landing height from its bar geometry and the freshly-set --fill-pct, not from the fill element's own live rect -- which still reports the pre-transition box while irv-app.ts's height transition is mid-flight", () => {
+    const dom = new JSDOM(
+      `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
+    );
+    const { window } = dom;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    const animateSpy = vi.fn();
+    window.HTMLElement.prototype.animate = animateSpy;
+
+    const root = window.document.querySelector("section")!;
+    const fillA = root.querySelector<HTMLElement>('[data-fill-for="a"]')!;
+    const barA = fillA.parentElement!;
+
+    // Mirrors irv-app.ts's render(): the click handler sets --fill-pct
+    // synchronously (a specified-value change -- there's no transition on
+    // the custom property itself), but .candidate-stack-fill's own rect
+    // still reports its pre-transition box at read time, because
+    // `transition: height 600ms ease` means the box's used value hasn't
+    // visually caught up yet by the time any bubble-phase listener runs.
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .addEventListener("click", () => {
+        fillA.style.setProperty("--fill-pct", "60%");
+      });
+
+    window.Element.prototype.getBoundingClientRect = function (
+      this: Element,
+    ) {
+      if (this === barA) return rect(100, 300, 40, 240);
+      if (this === fillA) return rect(292, 300, 40, 40);
+      if (this.hasAttribute("data-fill-for")) return rect(500, 500, 40, 40);
+      if (this.hasAttribute("data-candidate")) return rect(100, 100);
+      return rect(0, 0, 14, 19);
+    };
+
+    initIrvDrift(root, threeCandidateScenario());
+    clickNext(root);
+
+    const flightCalls = animateSpy.mock.calls.filter((call) =>
+      "transform" in (call[0] as Array<Record<string, unknown>>)[0],
+    );
+    expect(flightCalls.length).toBeGreaterThan(1);
+
+    const landingYs = flightCalls.map((call) => {
+      const frames = call[0] as Array<{ transform: string }>;
+      const match = /,\s*(-?\d+(?:\.\d+)?)px\)/.exec(
+        frames[frames.length - 1].transform,
+      )!;
+      return Number(match[1]);
+    });
+
+    // The bar's top is 100 and its height 240, so at --fill-pct: 60% the
+    // fill's true final top sits at 100 + 240 * (1 - 0.6) = 196 -- well
+    // above (a smaller y than) the stuck pre-transition rect's own top of
+    // 292. Falling back to the fill element's own live rect would land
+    // every chip at 292 instead, since that's all it ever reports here.
+    expect(Math.max(...landingYs)).toBeLessThan(292);
+    expect(Math.abs(Math.min(...landingYs) - 196)).toBeLessThan(2);
+  });
+
   it("captures the eliminated candidate's fill geometry before any other click listener can collapse it", () => {
     const dom = new JSDOM(
       `<!doctype html><html><body>${markup(["a", "b", "c"])}</body></html>`,
