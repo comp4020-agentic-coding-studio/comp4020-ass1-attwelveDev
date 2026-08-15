@@ -7,14 +7,13 @@ import type { Candidate, CandidateId, Scenario } from "../lib/types";
 // pushed toward the top of it so a receiving candidate's stream of arrivals
 // reads as substantial rather than a token few.
 const TOTAL_TRANSFER_CHIPS = 28;
+// The whole batch of chips for a receiving candidate lands within this
+// window, each at its own moment rather than all at once.
 const FLIGHT_DURATION_MS = 600;
-// Chips for the same receiver stagger their departure across this window
-// instead of all launching at once, so the transfer reads as a gradual
-// stream rather than a single simultaneous jump. Each chip's own flight
-// duration is shortened by however much its departure was delayed, so the
-// whole batch still finishes at FLIGHT_DURATION_MS — the same moment the
-// receiving stack's own --fill-pct CSS transition finishes growing.
-const STAGGER_WINDOW_MS = 350;
+// Each individual chip's own flight lasts up to this long -- shorter only
+// for the very first chips in a batch, which don't have this much runway
+// left before FLIGHT_DURATION_MS.
+const CHIP_FLIGHT_MS = 350;
 // Mirrors ballot-drift.ts's landed shape: the coloured stack bar is a stack
 // of ballot papers seen edge-on, so a landed chip flattens into a thin
 // colour-matched line rather than staying a small white rectangle.
@@ -133,6 +132,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     fromStyle: EdgeStyle,
     toStyle: EdgeStyle,
     delayMs: number,
+    durationMs: number,
   ): void {
     if (reducedMotion || typeof el.animate !== "function") {
       el.style.transform = `translate(${to.x}px, ${to.y}px)`;
@@ -145,13 +145,13 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     frames[0] = { ...frames[0], ...fromStyle };
     frames[frames.length - 1] = { ...frames[frames.length - 1], ...toStyle };
     el.animate(frames, {
-      duration: FLIGHT_DURATION_MS - delayMs,
+      duration: durationMs,
       delay: delayMs,
       fill: "forwards",
     });
   }
 
-  function fadeOutMark(mark: HTMLElement, delayMs: number): void {
+  function fadeOutMark(mark: HTMLElement, delayMs: number, durationMs: number): void {
     if (reducedMotion || typeof mark.animate !== "function") {
       mark.style.opacity = "0";
       return;
@@ -162,7 +162,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
         { opacity: 0, offset: 0.5 },
         { opacity: 0, offset: 1 },
       ],
-      { duration: FLIGHT_DURATION_MS - delayMs, delay: delayMs, fill: "forwards" },
+      { duration: durationMs, delay: delayMs, fill: "forwards" },
     );
   }
 
@@ -187,13 +187,22 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
       );
       const targetRect = target?.getBoundingClientRect();
       const toX = (targetRect?.left ?? containerRect.left) - containerRect.left;
-      const toY = (targetRect?.top ?? containerRect.top) - containerRect.top;
-      const to: BoxState = {
-        x: toX,
-        y: toY,
-        width: targetRect?.width ?? containerRect.width,
-        height: LANDED_STRIP_HEIGHT_PX,
-      };
+      const finalToY =
+        (targetRect?.top ?? containerRect.top) - containerRect.top;
+
+      // By the time this runs, irv-app.ts's own render() (an earlier
+      // bubble-phase listener on the same click) has already grown this
+      // receiving stack to its final height — there's no CSS transition on
+      // .candidate-stack-fill to catch mid-grow, so every chip converging on
+      // that one, already-final point reads as feeding into the middle of an
+      // already-tall bar rather than building it up. Landing each successive
+      // chip progressively higher — interpolated between where the fill's
+      // top edge sat *before* this transfer and where it ends up — makes
+      // each arrival read as adding to the top of a still-growing stack.
+      const startToY = preClickFillRects.get(id)?.top;
+      const fromToY = startToY !== undefined
+        ? startToY - containerRect.top
+        : finalToY;
 
       for (let i = 0; i < count; i++) {
         const chip = createMiniBallot(candidate);
@@ -206,13 +215,23 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
           height: naturalRect.height,
         };
 
-        const delayMs =
-          count > 1 ? Math.round((i / count) * STAGGER_WINDOW_MS) : 0;
+        const landFraction = (i + 1) / count;
+        const toY = fromToY + (finalToY - fromToY) * landFraction;
+        const to: BoxState = {
+          x: toX,
+          y: toY,
+          width: targetRect?.width ?? containerRect.width,
+          height: LANDED_STRIP_HEIGHT_PX,
+        };
+
+        const landAtMs = landFraction * FLIGHT_DURATION_MS;
+        const durationMs = Math.min(CHIP_FLIGHT_MS, landAtMs);
+        const delayMs = Math.round(landAtMs - durationMs);
 
         const mark = chip.querySelector<HTMLElement>(
           ".ballot-paper-mini-mark",
         );
-        if (mark) fadeOutMark(mark, delayMs);
+        if (mark) fadeOutMark(mark, delayMs, durationMs);
 
         flyTo(
           chip,
@@ -221,19 +240,22 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
           { backgroundColor: "#fff", borderWidth: "1px", borderRadius: "0.15rem" },
           { backgroundColor: candidate.colour, borderWidth: "0px", borderRadius: "0px" },
           delayMs,
+          durationMs,
         );
       }
     }
   }
 
   // irv-app.ts wires its own click listener on this same button, and (if
-  // registered first) its render() zeroes the eliminated candidate's
-  // --fill-pct — collapsing .candidate-stack-fill's absolutely-positioned
-  // box to a zero-height sliver — before a bubble-phase listener here would
-  // otherwise get to read it. A capturing listener runs before every
-  // bubble-phase listener on this element regardless of registration order,
-  // so snapshot every candidate's pre-click fill geometry here, and hand the
-  // eliminated one's snapshot (not a live re-query) to spawnTransferChips.
+  // registered first) its render() updates every --fill-pct in one go —
+  // collapsing the eliminated candidate's fill and growing every receiver's
+  // — before a bubble-phase listener here would otherwise get to read any of
+  // them pre-transfer. A capturing listener runs before every bubble-phase
+  // listener on this element regardless of registration order, so snapshot
+  // every candidate's pre-click fill geometry here: spawnTransferChips uses
+  // the eliminated one's snapshot as the flight's origin, and each
+  // receiver's snapshot as the "before" height its chips interpolate up
+  // from.
   let preClickFillRects = new Map<CandidateId, DOMRect>();
   nextButton.addEventListener(
     "click",
