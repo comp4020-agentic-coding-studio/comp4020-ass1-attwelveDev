@@ -1,7 +1,8 @@
 import { JSDOM } from "jsdom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { initFreeplayApp } from "./freeplay-app";
 import { FREEPLAY_MAX_CANDIDATES, FREEPLAY_MIN_CANDIDATES } from "../lib/freeplay-palette";
+import { tallyIrv } from "../lib/tally-irv";
 import type { Scenario } from "../lib/types";
 
 // Free play is the one place candidates get added and removed at runtime, so
@@ -32,11 +33,22 @@ function setUp(n: 2 | 3) {
       <div data-freeplay-columns></div>
       <p data-testid="winner"></p>
       <button type="button" data-action="add-candidate">Add candidate</button>
+      <button type="button" data-action="switch-system">Switch to preferential voting</button>
+      <div data-freeplay-recount hidden></div>
     </div></body></html>`,
   );
+  // initIrvApp/initIrvDrift (run inside the recount panel once IRV mode is
+  // switched on) each check prefers-reduced-motion -- jsdom has no real
+  // matchMedia, so stub it the same way irv-app.test.ts/irv-drift.test.ts do
+  // to avoid an unimplemented-API console warning on every test run.
+  dom.window.matchMedia = vi.fn().mockReturnValue({ matches: false });
   const root = dom.window.document.querySelector("#freeplay-app")!;
   initFreeplayApp(root, scenario(n));
   return { dom, root };
+}
+
+function click(dom: JSDOM, el: Element): void {
+  el.dispatchEvent(new dom.window.Event("click", { bubbles: true }));
 }
 
 describe("initFreeplayApp", () => {
@@ -180,5 +192,146 @@ describe("initFreeplayApp", () => {
     );
     expect(removeButtons.length).toBe(2);
     for (const button of removeButtons) expect(button.disabled).toBe(true);
+  });
+
+  it("toggling switch-system shows the ranking lists and recount panel, and flips its own label", () => {
+    const { dom, root } = setUp(3);
+    const switchButton = root.querySelector<HTMLButtonElement>(
+      'button[data-action="switch-system"]',
+    )!;
+    const recount = root.querySelector<HTMLElement>(
+      "[data-freeplay-recount]",
+    )!;
+
+    expect(recount.hidden).toBe(true);
+    const rankingGroups = root.querySelectorAll<HTMLElement>(
+      ".freeplay-ranking-group",
+    );
+    expect(rankingGroups.length).toBe(3);
+    for (const group of rankingGroups) expect(group.hidden).toBe(true);
+
+    click(dom, switchButton);
+
+    expect(switchButton.textContent).toBe("Switch to first-past-the-post");
+    expect(recount.hidden).toBe(false);
+    for (const group of rankingGroups) expect(group.hidden).toBe(false);
+
+    click(dom, switchButton);
+
+    expect(switchButton.textContent).toBe("Switch to preferential voting");
+    expect(recount.hidden).toBe(true);
+    for (const group of rankingGroups) expect(group.hidden).toBe(true);
+  });
+
+  it("builds a recount panel whose eventual winner matches tallyIrv on the equivalent scenario", () => {
+    const { dom, root } = setUp(3);
+    const switchButton = root.querySelector<HTMLButtonElement>(
+      'button[data-action="switch-system"]',
+    )!;
+    click(dom, switchButton);
+
+    const recount = root.querySelector<HTMLElement>(
+      "[data-freeplay-recount]",
+    )!;
+    const nextButton = recount.querySelector<HTMLButtonElement>(
+      'button[data-action="next-round"]',
+    )!;
+    // Free play hasn't been edited yet, so its rankings are exactly the
+    // starting scenario's -- tallyIrv on that same scenario is the ground
+    // truth this recount should reach once fully stepped through.
+    while (!nextButton.disabled) click(dom, nextButton);
+
+    const expectedWinner = tallyIrv(scenario(3)).winner;
+    expect(
+      recount.querySelector('[data-testid="winner"]')!.textContent,
+    ).toBe(`${expectedWinner.toUpperCase()} wins after the recount.`);
+  });
+
+  it("resets the recount panel back to round 0 after any edit made while in IRV mode", () => {
+    const { dom, root } = setUp(3);
+    const switchButton = root.querySelector<HTMLButtonElement>(
+      'button[data-action="switch-system"]',
+    )!;
+    click(dom, switchButton);
+
+    const recount = root.querySelector<HTMLElement>(
+      "[data-freeplay-recount]",
+    )!;
+    click(
+      dom,
+      recount.querySelector<HTMLButtonElement>(
+        'button[data-action="next-round"]',
+      )!,
+    );
+    expect(
+      recount.querySelector<HTMLButtonElement>(
+        'button[data-action="prev-round"]',
+      )!.disabled,
+    ).toBe(false);
+
+    // Any state-changing action taken while in IRV mode rebuilds the
+    // recount panel from scratch, so a changed vote always restarts the
+    // walkthrough at round 0.
+    const downButton = root.querySelector<HTMLButtonElement>(
+      ".freeplay-ranking-group button[data-action=\"move-ranking-down\"]:not([disabled])",
+    )!;
+    click(dom, downButton);
+
+    expect(
+      recount.querySelector<HTMLButtonElement>(
+        'button[data-action="prev-round"]',
+      )!.disabled,
+    ).toBe(true);
+  });
+
+  it("adding or removing a candidate while in IRV mode leaves every ranking a valid permutation, without throwing", () => {
+    const { dom, root } = setUp(3);
+    const switchButton = root.querySelector<HTMLButtonElement>(
+      'button[data-action="switch-system"]',
+    )!;
+    click(dom, switchButton);
+
+    const columns = root.querySelector("[data-freeplay-columns]")!;
+    const rankingsAreValid = (ids: string[]) => {
+      for (const ownerId of ids) {
+        const list = columns.querySelector(
+          `ol[data-ranking-for="${ownerId}"]`,
+        )!;
+        const rankedIds = [
+          ...list.querySelectorAll('button[data-action="move-ranking-up"]'),
+        ].map((button) => button.getAttribute("data-candidate-id"));
+        expect(rankedIds).not.toContain(ownerId);
+        expect(new Set(rankedIds)).toEqual(
+          new Set(ids.filter((id) => id !== ownerId)),
+        );
+      }
+    };
+
+    const addButton = root.querySelector<HTMLButtonElement>(
+      'button[data-action="add-candidate"]',
+    )!;
+    expect(() => click(dom, addButton)).not.toThrow();
+
+    const idsAfterAdd = [...columns.querySelectorAll("[data-candidate]")].map(
+      (el) => el.getAttribute("data-candidate")!,
+    );
+    expect(idsAfterAdd).toHaveLength(4);
+    rankingsAreValid(idsAfterAdd);
+
+    const removeButton = root.querySelector<HTMLButtonElement>(
+      'button[data-action="remove-candidate"]',
+    )!;
+    expect(() => click(dom, removeButton)).not.toThrow();
+
+    const idsAfterRemove = [
+      ...columns.querySelectorAll("[data-candidate]"),
+    ].map((el) => el.getAttribute("data-candidate")!);
+    expect(idsAfterRemove).toHaveLength(3);
+    rankingsAreValid(idsAfterRemove);
+
+    const recount = root.querySelector<HTMLElement>(
+      "[data-freeplay-recount]",
+    )!;
+    expect(recount.querySelectorAll("[data-candidate]").length).toBe(3);
   });
 });

@@ -143,12 +143,24 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     typeof view.matchMedia === "function" &&
     view.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // The chips currently landed from the most recent forward transfer, and
-  // who they flew from -- cleared by reverseTransferChips() once a
-  // "Previous round" click sends them back, so an unlimited number of
-  // next/prev cycles each start from a clean slate rather than piling up.
-  let liveChips: LiveChip[] = [];
-  let liveEliminated: CandidateId | null = null;
+  // One entry per successful controller.next(), in order, so a "Previous
+  // round" click can always find and reverse-animate the batch that
+  // belongs to the step it's undoing -- not just the single most recent
+  // one. A "Previous round" click pops the last entry; a "Next round"
+  // click pushes a new one. Entries stay in the array (and their chips in
+  // the DOM) until popped, so repeated consecutive "Previous round"
+  // clicks each have their own real chips to reverse instead of finding
+  // an already-cleared slot -- except a batch's individual chips can be
+  // removed early, out of turn, by purgeStrandedChips if the candidate
+  // they landed on is later eliminated themselves; reverseTransferChips
+  // skips those via el.isConnected rather than assuming every chip it was
+  // given is still live. null marks a next() step that had nothing to
+  // animate (no elimination/transfer to show), so the stack still stays
+  // index-aligned with controller.roundIndex.
+  const transferBatches: Array<{
+    eliminated: CandidateId;
+    chips: LiveChip[];
+  } | null> = [];
 
   function createMiniBallot(candidate: Candidate): HTMLElement {
     const chip = doc.createElement("span");
@@ -221,12 +233,10 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   }
 
   function spawnTransferChips(
-    eliminated: CandidateId,
     transfers: Record<CandidateId, number>,
     fromRect: DOMRect | undefined,
-  ): void {
-    liveChips = [];
-    liveEliminated = eliminated;
+  ): LiveChip[] {
+    const chips: LiveChip[] = [];
 
     const containerRect = container!.getBoundingClientRect();
     const from = {
@@ -311,7 +321,7 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
           durationMs,
         );
 
-        liveChips.push({
+        chips.push({
           el: chip,
           receivedBy: id,
           naturalWidth: naturalRect.width,
@@ -320,20 +330,38 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
         });
       }
     }
+
+    return chips;
   }
 
-  // The reverse of spawnTransferChips: flies every chip currently landed at
-  // a receiving candidate's stack back to the eliminated candidate's stack
-  // (growing back into a natural mini-ballot shape as it goes, mirroring the
-  // forward flight's box/style interpolation exactly in reverse) and removes
-  // it once that return flight lands, so a later "Next round" click always
-  // starts from an empty slate.
-  function reverseTransferChips(): void {
-    if (liveEliminated === null || liveChips.length === 0) return;
-    const eliminated = liveEliminated;
-    const chips = liveChips;
-    liveChips = [];
-    liveEliminated = null;
+  // A candidate's landed chips are frozen at the absolute pixel position
+  // their receiving stack's fill top sat at when they arrived
+  // (computeFinalFillTop, read once in spawnTransferChips and never
+  // revisited). That's invisible while the stack only ever grows further --
+  // the old chip just ends up submerged inside the taller, same-coloured
+  // fill above it. But once *that* candidate is themselves eliminated and
+  // their own fill collapses toward zero, any chip that landed earlier is
+  // left stranded above the now-short fill -- a stray colour-matched sliver
+  // floating in what looks like empty space. Called right when a candidate
+  // becomes the newly eliminated one, this removes every previously-landed
+  // chip that had arrived in *their* stack, from any earlier batch, since
+  // there's no longer a matching fill underneath for it to sit in.
+  function purgeStrandedChips(candidateId: CandidateId): void {
+    for (const batch of transferBatches) {
+      if (!batch) continue;
+      for (const chip of batch.chips) {
+        if (chip.receivedBy === candidateId) chip.el.remove();
+      }
+    }
+  }
+
+  // The reverse of spawnTransferChips: flies every chip in the given batch
+  // back to the eliminated candidate's stack (growing back into a natural
+  // mini-ballot shape as it goes, mirroring the forward flight's box/style
+  // interpolation exactly in reverse) and removes each chip once its return
+  // flight lands.
+  function reverseTransferChips(eliminated: CandidateId, chips: LiveChip[]): void {
+    if (chips.length === 0) return;
 
     const containerRect = container!.getBoundingClientRect();
     const target = root.querySelector<HTMLElement>(
@@ -346,6 +374,10 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
     const finalToY = computeFinalFillTop(target, containerRect) ?? fallbackToY;
 
     for (const { el, receivedBy, naturalWidth, naturalHeight, landFraction } of chips) {
+      // purgeStrandedChips may have already removed this exact element, if
+      // its receiving candidate was later eliminated and this batch is only
+      // now being reversed past that point -- nothing left to fly back.
+      if (!el.isConnected) continue;
       const candidate = candidatesById.get(receivedBy);
       const chipRect = el.getBoundingClientRect();
       const fromBox: BoxState = {
@@ -424,9 +456,14 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
 
     const eliminated = controller.justEliminated;
     const transfers = controller.justTransfers;
-    if (!eliminated || !transfers) return;
+    if (!eliminated || !transfers) {
+      transferBatches.push(null);
+      return;
+    }
 
-    spawnTransferChips(eliminated, transfers, preClickFillRects.get(eliminated));
+    purgeStrandedChips(eliminated);
+    const chips = spawnTransferChips(transfers, preClickFillRects.get(eliminated));
+    transferBatches.push({ eliminated, chips });
   });
 
   // Kept in lockstep with irv-app.ts's own controller the same way next()
@@ -436,8 +473,14 @@ export function initIrvDrift(root: ParentNode, scenario: Scenario): void {
   // forth. Without this, only next() ever moved this controller's index, so
   // a Previous click silently desynced the two and the following Next click
   // would find controller.next() already exhausted -- spawning nothing.
+  //
+  // transferBatches.pop() mirrors that same lockstep discipline for the
+  // animation state: it always undoes exactly the batch that this prev()
+  // step corresponds to, so any number of consecutive "Previous round"
+  // clicks each animate correctly, not just the first.
   prevButton?.addEventListener("click", () => {
     if (!controller.prev()) return;
-    reverseTransferChips();
+    const batch = transferBatches.pop();
+    if (batch) reverseTransferChips(batch.eliminated, batch.chips);
   });
 }

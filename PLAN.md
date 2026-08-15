@@ -1250,6 +1250,214 @@ Checks:
   "won't rebuild a multi-party system on its own") so it doesn't overstate
   what a three-candidate demo can prove about real electoral systems.
 
+## Feature: an IRV free-play mode, sharing candidates and vote counts with the FPTP sandbox
+
+Free play (`#freeplay-app`) only ever counted first-past-the-post, even
+though the rest of the page's whole point is that the same votes can be
+counted two different ways. The user asked for a second, IRV free-play mode
+on the *same* candidates and vote counts, toggled with a "switch systems"
+button. The open design problem: IRV needs a full preference ranking per
+voter, but free play only ever tracked one first-preference count per
+candidate — there was no ranking data to adjust at all. Resolved with the
+user via `AskUserQuestion`: give the reader a **full, reorderable ranking
+per candidate bloc** — for each candidate, an ordered list of every *other*
+candidate representing where that candidate's own voters' preferences go,
+in order, if their candidate is eliminated. This is the same one-ranking-
+per-bloc simplification every `src/data/scenario-*.ts` file already uses,
+just exposed as an editable control. Reordering is up/down move buttons per
+list item, not pointer drag-and-drop, so it stays keyboard- and
+touch-operable per this file's own accessibility bar, without a new
+dependency.
+
+- **Data model** (`src/lib/freeplay-candidates.ts`): `FreeplayState` gained
+  `rankings: Record<CandidateId, CandidateId[]>`. `addCandidate` appends the
+  new id last to every existing bloc's ranking and seeds the new candidate's
+  own ranking as a full permutation of the rest; `removeCandidate` strips
+  the removed id from every remaining ranking with no orphans; a new
+  `moveRankingEntry(state, ownerId, candidateId, direction)` swaps a
+  candidate with its neighbour, no-op at either boundary.
+- **Scenario synthesis** (new `src/lib/freeplay-scenario.ts`): `toScenario`
+  turns the editable state into a real `Scenario` (one `BallotGroup` per
+  candidate, `ranking: [ownerId, ...rankings[ownerId]]`), so every existing
+  tally/controller function (`tallyFptp`, `tallyIrv`, `createIrvController`)
+  runs completely unchanged against it — no IRV-specific tallying logic
+  needed in free play at all. `initialRankings` derives a starting rankings
+  map from a scenario whose groups already carry one full ranking per
+  candidate bloc, used to seed free play from the existing
+  `scenario-freeplay.ts` data.
+- **UI** (`src/scripts/freeplay-app.ts`): a `mode: "fptp" | "irv"` toggle,
+  defaulting to `"fptp"` (unchanged existing behaviour). The editable
+  candidate stacks/sliders are untouched; in IRV mode each stack additionally
+  shows its ranking list (hidden via the native `hidden` attribute in FPTP
+  mode). The recount panel (`[data-freeplay-recount]`) is wholly separate
+  DOM, mirroring the scripted `#recount-app` section's exact contract
+  (`.candidate-columns[data-ballot-drift]` of plain `[data-candidate]`
+  stacks, plus `.recount-status`/`.recount-controls`) so `initIrvApp` and
+  `initIrvDrift` — **including the chip-flight transfer animation** — run
+  against it completely unchanged. Per the user's explicit follow-up
+  ("make sure to also add the transfer animation like in 'Recounting the
+  same election under IRV'"), this reuse is the point of the whole design,
+  not an incidental detail. The recount panel is rebuilt from scratch
+  (never patched in place) on every mode switch to `"irv"` and on every
+  state-changing action taken while already in `"irv"` mode, always
+  restarting the walkthrough at round 0 — a changed vote is a new election.
+  No changes needed to `irv-app.ts`, `irv-drift.ts`, `tally-irv.ts`,
+  `tally-fptp.ts`, or `irv-controller.ts`.
+- **Styling**: `.freeplay-ranking-group`/`.freeplay-ranking` reuse only
+  existing neutral chrome tokens (`--colour-ink-muted` etc.), visually
+  subordinate to the candidate stack they belong to — no new colours, per
+  this file's palette rule.
+
+Checks:
+- `src/lib/freeplay-candidates.test.ts` — extended for `rankings`:
+  add/remove keep every ranking a full permutation of the remaining
+  candidates with no orphans; new `moveRankingEntry` tests cover swap-up,
+  swap-down, and no-op at both boundaries.
+- `src/lib/freeplay-scenario.test.ts` (new) — `toScenario` builds one group
+  per candidate with the owner first and the right count, and tallies
+  correctly through the real (not mocked) `tallyFptp`/`tallyIrv`;
+  `initialRankings` derives the right rankings from a hand-built `Scenario`.
+- `src/scripts/freeplay-app.test.ts` — extended: toggling `switch-system`
+  shows the ranking lists and recount panel and flips its own label; the
+  recount panel's eventual winner (stepped through via "Next round" until
+  final) matches `tallyIrv` run directly on the equivalent scenario; any
+  edit made while already in IRV mode (a ranking move) resets the recount
+  panel back to round 0; adding or removing a candidate while in IRV mode
+  doesn't throw and leaves every ranking a valid permutation of the
+  remaining candidates; all pre-existing FPTP-mode tests stay green
+  unchanged.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 165
+  tests passing. The stylelint pass caught one real
+  `no-descending-specificity` issue (`.freeplay-ranking button` overlapping
+  an earlier, higher-specificity `button:hover:not(:disabled)` rule), fixed
+  by scoping the selector to `.freeplay-ranking-group .freeplay-ranking
+  button` rather than suppressing the rule.
+- **Manual browser pass** (`pnpm preview`, both marking viewports —
+  1920×1080 and 390×844) — required before this is done, since it reuses
+  the chip-flight transfer animation against reader-authored data for the
+  first time: confirm the recount panel's next/prev-round transfer
+  animation plays correctly for a freshly synthesized scenario; ranking
+  move buttons and the mode-toggle button are keyboard-reachable with a
+  visible focus ring; the ranking lists read clearly at phone width without
+  crowding the stack; chrome colours (ranking list, move buttons, toggle
+  button) are never confused with a candidate hue or the leader-badge gold.
+
+## Fix: consecutive "Previous round" clicks lost the transfer animation
+
+Reported bug: stepping forward through IRV rounds was "perfect" every time,
+but stepping backward wasn't — the *first* "Previous round" click animated
+correctly, but every consecutive one after it (without an intervening
+"Next") showed no chip animation at all and the receiving stack jumped
+straight to its correct tally instead of visibly depleting. This affected
+both the free-play recount panel above and the original scripted
+"Recounting the same election under IRV" section, since both are driven by
+the same unmodified `irv-drift.ts`.
+
+- **Root cause**: the "Feature: IRV transfer animation reverses on
+  Previous..." entry above fixed the *desync* between `irv-app.ts`'s and
+  `irv-drift.ts`'s controllers, but its own `LiveChip[]`/`liveEliminated`
+  state was a single mutable slot holding only the *most recent* forward
+  transfer — not a real per-round history. `reverseTransferChips()`
+  unconditionally cleared that slot after using it, so exactly one reverse
+  worked (whatever `spawnTransferChips` had just written), and every
+  following "Previous" click found the slot empty and silently no-opped.
+  This is why the earlier manual pass ("Next → Previous → Next → Previous →
+  Next") never caught it: alternating clicks always refill the slot with a
+  `Next` before the next `Previous` needs it, so only two or more
+  *consecutive* "Previous" clicks — the case the user actually hit — expose
+  the gap. The underlying round data itself (`irv-controller.ts`) was never
+  wrong at any step; the numbers a reader saw after the animation skipped
+  were always the correct tally for that round, just unanimated.
+- **Fix**: replaced the single slot with `transferBatches`, an array pushed
+  on every successful `next()` (one entry per round transition, `null` for
+  the rare transition with nothing to animate) and popped on every
+  successful `prev()`. `spawnTransferChips` now returns the batch of chips
+  it created instead of writing to shared state; `reverseTransferChips`
+  takes a specific batch as a parameter instead of reading a module-level
+  variable. Because each "Previous" click pops and reverses its own real
+  batch — the one that actually belongs to the step being undone — any
+  number of consecutive clicks in either direction now animates correctly,
+  not just alternating ones.
+- Shared-code fix: since `irv-drift.ts` is used unmodified by both the
+  scripted section and the free-play recount panel, this fix applies to
+  both with no per-caller changes.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 165
+  tests passing, no new warnings (one unused-parameter hint from the old
+  single-slot design was also cleaned up along the way).
+- **Manual browser pass** (`pnpm preview`, both marking viewports —
+  1920×1080 and 390×844), specifically targeting the case the earlier pass
+  missed: stepped forward through all rounds, then clicked "Previous round"
+  **twice in a row with no intervening "Next"** in both the free-play
+  recount panel and the scripted section. Confirmed the animation now plays
+  on every consecutive click (chips visibly flying back each time, not just
+  the first), the settled tallies are correct with zero leftover chip
+  elements in the DOM afterward, and the scripted section's single-reverse
+  case (only one elimination in that scenario) still animates as before.
+
+## Fix: a stray chip left hanging in a since-eliminated candidate's stack
+
+Reported bug (screenshot, 6-candidate free-play scenario): after Dahlia was
+eliminated in round 4 of a "Next round"-only walkthrough (never using
+"Previous"), her stack bar showed an orange sliver floating partway up an
+otherwise-empty column — visually disconnected from the bar, "hanging in
+the middle of Dahlia's rectangle."
+
+- **Root cause**: `spawnTransferChips` computes a landed chip's y-position
+  once, via `computeFinalFillTop` at the moment it lands, and never
+  revisits it — the chip is just a plain absolutely-positioned element
+  holding that pixel position forever (or until `reverseTransferChips`
+  explicitly flies it back out). That's invisible as long as the receiving
+  candidate's fill only ever grows afterward: an older chip ends up
+  submerged inside a taller fill of the same colour, indistinguishable from
+  the solid stack. But if that candidate is *themselves* eliminated in a
+  later round, their fill collapses toward zero while the old chip's frozen
+  position doesn't move with it — stranding it above the now-short fill as
+  a visible, disconnected sliver. Dahlia had received a transfer batch of
+  chips two rounds earlier (when Beech was eliminated and her voters'
+  ranking pointed to Dahlia next); those chips were never cleaned up on
+  ordinary forward stepping, only ever reversed by an explicit "Previous"
+  click undoing that exact round — which a reader who only ever clicks
+  "Next" never does. The user's other observation in the same report —
+  Dahlia's votes splitting to transfer into both Alder and Ebony on her own
+  elimination — is correct IRV behaviour, not a bug: different blocs that
+  had each landed in Dahlia's stack in earlier rounds carry their own
+  distinct remaining rankings, so a single candidate's elimination
+  routinely fans out to more than one receiver.
+- **Fix**: a new `purgeStrandedChips(candidateId)` in `irv-drift.ts`, called
+  right when a candidate becomes the newly eliminated one (before spawning
+  that round's own outgoing transfer). It walks every batch in
+  `transferBatches` and removes any chip whose `receivedBy` is that
+  candidate — regardless of which earlier round's batch it belongs to —
+  since there's no longer a matching fill underneath for it to sit in.
+  Because this can now remove a chip out of turn, ahead of the "Previous"
+  click that would otherwise have reversed its batch,
+  `reverseTransferChips` skips any chip whose element is no longer
+  `.isConnected` instead of assuming every chip it's handed is still live —
+  reversing the rest of that batch normally, just without a redundant
+  fly-back for the ones already purged.
+- Shared-code fix: applies to both the free-play recount panel and the
+  scripted section, same as every other `irv-drift.ts` fix, though the
+  scripted scenario only ever has one elimination and so never exercises
+  this path.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 165
+  tests passing, no new warnings.
+- **Manual browser pass** (`pnpm preview`, both marking viewports —
+  1920×1080 and 390×844): built a 6-candidate free-play scenario tuned so
+  Beech's elimination (round 1→2) transfers into Dahlia, then Dahlia
+  herself is eliminated two rounds later (round 3→4) — the same shape as
+  the reported bug. Confirmed via the DOM that Dahlia's stack held 28
+  landed chips right after receiving Beech's transfer, and exactly 0 right
+  after her own elimination; confirmed visually (screenshot) that her bar
+  is a clean, empty column with no stray fragment, at both viewports.
+  Also stepped "Previous round" all the way back past that purge point (4
+  clicks) with no console errors and the correct round-1 tallies restored,
+  and re-ran the scripted section's own single-elimination case forward and
+  back to confirm no regression there.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice
