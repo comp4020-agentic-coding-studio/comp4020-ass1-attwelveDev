@@ -30,7 +30,7 @@ function markup(ids: string[]): string {
   const stacks = ids
     .map(
       (id) =>
-        `<div data-candidate="${id}"><span data-count-for="${id}">0</span><div data-fill-for="${id}"></div><span class="candidate-stack-leader-badge"></span></div>`,
+        `<div data-candidate="${id}"><span data-count-for="${id}">0</span><div data-fill-for="${id}"></div><span class="candidate-stack-leader-badge"></span><input type="range" class="candidate-stack-slider" data-slider-for="${id}" /></div>`,
     )
     .join("");
   return `<section>${stacks}<p data-testid="round-status"></p><p data-testid="winner"></p><button data-action="prev-round">Prev</button><button data-action="next-round">Next</button></section>`;
@@ -49,6 +49,16 @@ function setUp(reducedMotion = false, scenarioOverride: Scenario = scenario) {
 }
 
 describe("initIrvApp", () => {
+  it("disables every candidate's slider -- a recount isn't reader-adjustable", () => {
+    const root = setUp();
+
+    for (const slider of root.querySelectorAll<HTMLInputElement>(
+      ".candidate-stack-slider",
+    )) {
+      expect(slider.disabled).toBe(true);
+    }
+  });
+
   it("renders round 1 counts with no winner yet, prev disabled", () => {
     const root = setUp();
 

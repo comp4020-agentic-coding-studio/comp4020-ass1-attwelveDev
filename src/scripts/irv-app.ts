@@ -31,6 +31,16 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
     if (id) stackEls.set(id, el);
   }
 
+  // Each stack still renders the same draggable-slider markup as
+  // explore/spoiler (CandidateStack.astro), but a recount isn't something
+  // the reader adjusts -- disable it here rather than leaving a focusable
+  // control that silently does nothing when dragged.
+  for (const slider of root.querySelectorAll<HTMLInputElement>(
+    ".candidate-stack-slider",
+  )) {
+    slider.disabled = true;
+  }
+
   // Round 1's leader (highest count so far, before any elimination) isn't
   // necessarily who the recount ends up crowning -- that gap is the whole
   // point of this section -- so it's computed the same way the FPTP

@@ -1560,6 +1560,71 @@ Checks:
   cleanly as a first-time reader moving straight from that ballot into
   this interactive demo.
 
+## Feature: scrollytelling reveal for the spoiler-effect section
+
+The spoiler-effect section was one dense paragraph next to a sticky
+visualisation that never reacted to anything — nothing tied the prose to
+which candidates it was actually talking about, and "similar candidates"
+never said what they were similar *in*. The user asked for the paragraph
+to break into stages that light up from muted to ink colour as the reader
+scrolls to each one, in sync with the sticky viz dimming whichever
+candidates that stage isn't about.
+
+- Copy split into four beats in `index.astro`: a plain, already-ink intro
+  that gives "similar" a concrete meaning ("courting the same voters"),
+  then three scroll-revealed steps — Aster/Birch splitting the vote,
+  Cedar's win condition, and a closing invite back into the drag
+  interaction — each carrying a `data-spotlight` attribute (a comma-separated
+  candidate-id list, empty on the closing step) naming which candidates
+  the sticky viz should leave highlighted.
+- New `src/scripts/spoiler-story.ts` (`initSpoilerStory`), wired in
+  `bootstrap.ts`: reuses the centred-band `IntersectionObserver` pattern
+  already established by `ballot-drift.ts`'s hero reveal
+  (`rootMargin: "-35% 0px -35% 0px"`), but simpler — it only toggles CSS
+  classes rather than playing a one-shot animation, so it needs no
+  first-callback guard. Reversible by construction: the visible state is a
+  pure function of which step currently intersects the band, so scrolling
+  back up fades a step out exactly as scrolling past it forward faded it
+  in. No `IntersectionObserver` → every step reveals immediately and no
+  candidate is dimmed (graceful degradation, matching the convention in
+  `ballot-drift.ts`/`ballot-marks.ts`).
+- New `.candidate-stack.is-dimmed` state in `global.css` (opacity 0.35 +
+  55% greyscale on the whole stack) — de-emphasises a candidate's own
+  colour rather than introducing a new hue, per CLAUDE.md's "palette is
+  neutral chrome" rule, and composes with the existing `.is-leading`
+  gold ring rather than replacing it. New `.chapter-prose-story` modifier
+  and `.scroll-step`/`.is-revealed` rules (muted → `--colour-ink`,
+  already-AA-checked in `contrast.test.ts`) scoped so every other
+  `.chapter-prose` keeps its single-paragraph centring untouched. Both new
+  transitions respect `prefers-reduced-motion: reduce`.
+- Out of scope: no change to `.chapter-prose`'s shared layout for other
+  sections, no change to `.is-leading`/`.is-winner`, no `spring.ts`
+  easing — a CSS `transition` is enough for a colour/opacity swap.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green —
+  181 tests passing, including 5 new cases in `spoiler-story.test.ts`
+  (reveal + spotlight, reversal in both directions, the empty-spotlight
+  closing step clearing every dim, no-`IntersectionObserver` degradation,
+  and a root with no `.scroll-step`s).
+- **Manual browser pass** (`pnpm preview`, both marking viewports):
+  scrolled down through all three steps at 1920×1080 and confirmed each
+  goes muted → ink as it centres, in sync with the viz dimming exactly the
+  candidates not named in its `data-spotlight` (verified via computed
+  styles, not just by eye); scrolled back to the top and confirmed the
+  intro and first step return to their pre-scroll state with no stuck
+  highlighting. Repeated at 390×844 — confirmed the sticky viz (pinned to
+  the top of the viewport on mobile) and the reveal/dim logic both still
+  work correctly, checked via computed `color`/`is-dimmed` state at the
+  centred scroll position. Noticed the third candidate column overflowing
+  off-screen on mobile at this viewport, but confirmed via a screenshot of
+  the untouched explore section that this pre-exists this change, so it's
+  a separate, pre-existing layout issue rather than a regression here.
+  Toggled `prefers-reduced-motion: reduce` via `agent-browser set media
+  reduced-motion` and confirmed both the step-colour and stack-dimming
+  transitions compute to `0s` duration. Read all four beats cold, start to
+  finish, per CLAUDE.md's "assume nothing" rule.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice

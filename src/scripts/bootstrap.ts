@@ -7,6 +7,7 @@ import { initBallotMarks } from "./ballot-marks";
 import { initFreeplayApp } from "./freeplay-app";
 import { initIrvApp } from "./irv-app";
 import { initIrvDrift } from "./irv-drift";
+import { initSpoilerStory } from "./spoiler-story";
 
 const fptpIntroRoot = document.querySelector("#fptp-ballot-intro");
 const exploreRoot = document.querySelector("#explore-app");
@@ -16,12 +17,14 @@ if (exploreRoot) {
 }
 
 const spoilerRoot = document.querySelector("#spoiler-app");
+const spoilerProseRoot = document.querySelector("#spoiler-prose");
 if (spoilerRoot) {
   initApp(spoilerRoot, scenarioSpoiler);
   // No hero here: the spoiler's point (a whole electorate splitting its
   // vote) isn't something any single ballot illustrates, unlike the intro
   // chapters' "how the ballot works" heroes.
   initBallotDrift(null, spoilerRoot, scenarioSpoiler);
+  if (spoilerProseRoot) initSpoilerStory(spoilerProseRoot, spoilerRoot);
 }
 
 const irvIntroRoot = document.querySelector("#irv-ballot-intro");
