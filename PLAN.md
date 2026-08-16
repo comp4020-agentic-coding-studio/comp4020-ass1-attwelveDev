@@ -1801,6 +1801,33 @@ Checks:
   unchanged.
 - Candidate colour is never the only signal (see Visual design above).
 
+## Feature: the plain single-paragraph chapters get the same scroll fade as the storied ones
+
+The multi-beat sections (spoiler, strategic voting) already fade their prose
+between muted and ink colour as each beat scrolls through the centred band of
+the viewport — the four plain, single-paragraph chapters ("How the ballot
+works," "How first-past-the-post works," "How preferential ballots work,"
+"Recounting the same election under IRV") didn't, so their prose looked more
+"settled"/pre-read than the storied ones the moment a reader landed on them.
+
+`new src/scripts/chapter-fade.ts` (`initChapterFade`) reuses the existing
+`.scroll-step`/`.is-revealed` CSS and the same centred-band
+`IntersectionObserver` (`{ threshold: 0, rootMargin: "-35% 0px -35% 0px" }`)
+idiom `spoiler-story.ts`/`strategic-story.ts` already established, simplified
+down to just the fade — no viz spotlight or slider-locking to drive, so no
+first-callback guard or spotlight bookkeeping is needed. Zero new CSS: the
+generic `.scroll-step` rule in `global.css` already isn't scoped to any one
+section. `index.astro` gained an `id` on each of the four `.chapter-prose`
+divs and `class="scroll-step"` on each one's single `<p>`; `bootstrap.ts`
+calls `initChapterFade` on each.
+
+Checks:
+- `chapter-fade.test.ts` — no-`.scroll-step` no-op case; graceful degradation
+  (all revealed immediately) when `IntersectionObserver` is unavailable; a
+  fake-observer case asserts `.is-revealed` toggles on and back off as the
+  step crosses the band.
+- `pnpm check` (typecheck, build, lint, full test suite) stays green.
+
 ## Explicitly out of scope
 
 - STV / multi-seat systems — single-seat IRV only, for a direct comparison

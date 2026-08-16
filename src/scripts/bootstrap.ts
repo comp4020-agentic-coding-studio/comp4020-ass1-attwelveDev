@@ -4,6 +4,7 @@ import { scenarioSpoiler } from "../data/scenario-spoiler";
 import { initApp } from "./app";
 import { initBallotDrift } from "./ballot-drift";
 import { initBallotMarks } from "./ballot-marks";
+import { initChapterFade } from "./chapter-fade";
 import { initFreeplayApp } from "./freeplay-app";
 import { initIrvApp } from "./irv-app";
 import { initIrvDrift } from "./irv-drift";
@@ -46,3 +47,17 @@ const freeplayRoot = document.querySelector("#freeplay-app");
 if (freeplayRoot) initFreeplayApp(freeplayRoot, scenarioFreeplay);
 
 initBallotMarks(document);
+
+// Same muted<->ink scroll fade as the spoiler/strategic sections' scroll
+// steps, applied to the plain single-paragraph chapters too, so no chapter's
+// prose looks more "settled" than the others while it isn't the reader's
+// current focus.
+for (const id of [
+  "#fptp-ballot-prose",
+  "#explore-prose",
+  "#irv-ballot-prose",
+  "#recount-prose",
+]) {
+  const root = document.querySelector(id);
+  if (root) initChapterFade(root);
+}
