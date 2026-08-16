@@ -42,7 +42,12 @@ jobs:
         if: ${{ !github.event.repository.is_template }}
         run: pnpm check:evidence
       - name: Check internal links
-        run: pnpm dlx linkinator ./dist --silent
+        # Skips _astro/: Astro writes those asset URLs base-prefixed for the
+        # deployed site (astro.config.mjs), which a flat local ./dist 404s on
+        # since it isn't nested under that prefix -- the bundler already
+        # guarantees those, and the "Verify the deployed site is online" step
+        # below re-checks the real thing once it's actually hosted there.
+        run: pnpm dlx linkinator ./dist --silent --skip "_astro/"
       - name: Scan for committed secrets
         # Pinned, both halves: the SHA fixes the action's script, and `version`
         # fixes the scanner image, which otherwise floats on :latest. These two
