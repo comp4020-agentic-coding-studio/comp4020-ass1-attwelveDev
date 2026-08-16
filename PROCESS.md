@@ -1,83 +1,74 @@
 # Process overview
 
-<!-- TEMPLATE: this file is a shape to fill in, not a form. Replace everything
-     in it with your own overview, and delete this comment — `pnpm
-     check:evidence` will remind you if it's still here. -->
-
-A reading-guide to how the work came together --- a map to your process, not an
-essay about it. Markers read this file and follow its citations; they don't
-trawl the repo for evidence you didn't point at, so if a moment mattered, cite
-it.
-
-This file is the shape; the course site's
-[assessment page](https://comp.anu.edu.au/courses/comp4020-agentic-coding-studio/topics/assessment/#what-you-submit)
-is the requirement, and each brief adds its own word count and moment count.
-
 ## What I built
 
-One paragraph: the thing, and the idea behind it.
+I built a website with a storytelling structure that explains the first-past-the-post (FPTP) voting system, including its flaws, despite the fact that it is still used in many countries including the US, the UK, Canada, and India.
+Then, it compares FPTP with preferential voting (a.k.a. instant-runoff voting, IRV), and how it resolves the aforementioned flaws with FPTP.
+Ultimately, my aim is to show how the voting system itself, and not just the votes cast, can change who wins in an election.
+The core interaction is the sticky visualisation design pattern, where there is a visualisation that is pinned to the viewport, and it is paired with scrolling text blocks to complement.
+The visualisations can further be interacted with in different ways throughout the page.
+For example, users can adjust a candidate's 'vote stack' and see how that changes the winner, across both voting systems, or specifically with IRV, users can step through the recounting rounds. 
 
 ## The moments that mattered
 
-Three or four for an assignment; fewer is fine for a weekly prototype. Keep the
-list short so each moment has room to do all four jobs:
+### Clarifying the storytelling structure, and audience
 
-1. **what happened** --- the problem, or the thing the agent got wrong
-2. **what you did instead of the obvious thing** --- the call you made, and why
-   it beat the obvious one
-3. **how you knew it was right** --- the check you ran, the viewport you looked
-   at, what you read before accepting the diff
-4. **the citation** --- a commit or commit range, a `CLAUDE.md` change, a check
-   that went from red to green, a prompt paired with the commit it produced
+The prototype had reached a stage where the core of the explanations were all added, but the storytelling structure prompted from the beginning did not ultimately result in a coherent structure.
+Specifically, the page lacked an introduction, a conclusion, and a clear but smooth transition point between the two voting systems, all of which would make the story feel more complete and cohesive.
+Furthermore, some sections felt difficult to understand for those without background knowledge in voting systems or politics. For example, 
 
-Jobs 2 and 3 are the ones the repo can't tell a reader on its own, so they're
-where the marks are. The strongest moments are the ones where a correction
-landed in the **harness** rather than in another prompt --- a rule added to
-`CLAUDE.md`, a check wired up, an attempt thrown away: re-prompting until it
-passes is the routine case, and changing what the agent works against is the
-skilled one.
+![lack of clarity in spoiler effect section](docs/audience_clarity_before.png)
 
-Cite each moment as a link whose text is the commit hash or range and whose
-target is this repo's commit or compare URL, so a reader clicks straight to the
-evidence:
+where the wording around the majority and minority feels clunky, the paragraph does not flow well, and there is a real effect behind the explanation, which is not named.
 
-- one commit: [`a1b2c3d`](https://github.com/YOUR-ORG/YOUR-REPO/commit/a1b2c3d)
-- a range:
-  [`a1b2c3d...e4f5a6b`](https://github.com/YOUR-ORG/YOUR-REPO/compare/a1b2c3d...e4f5a6b)
+The obvious fix would have been to re-prompt to add an introduction, conclusion, and fix any unclear sections.
+However, I may miss some sections, and future sections may not adhere to this requirement, creating inconsistency.
+Instead, I prompted the agent to embed this requirement in `CLAUDE.md` to ensure all future prompts would continue to follow the cohesive storytelling structure ([`72ac3a0...b0a80da`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-attwelveDev/compare/72ac3a0...b0a80da)):
 
-To pair a prompt with the commit it produced, quote the prompt (curated, not a
-full transcript) next to the citation:
+> [...] Next, I want to write to CLAUDE.md to emphasise that this website follows a cohesive story structure. That means there should be an introduction with motivation to help a regular reader understand the context. There should also be a conclusion with key takeaways. Because the story is cohesive, make it clear, yet smooth that we are transitioning from one voting system to the next. Assume that the reader has no background knowledge in voting systems or politics, beyond possibly knowing what a voting ballot paper is. [...]
 
-> the prompt, verbatim
+To confirm this change succeeded, I went through the page to ensure an introduction and conclusion had been added, along with explanations being easier to understand. For the same example as before,
 
-Screenshots are welcome where one carries the verification better than a
-sentence does. Commit the file to this repo and link it with a **relative**
-path, which is what makes it render on GitHub: `![alt text](docs/before.png)`.
-Images don't count towards the word count and don't replace the citation.
+![improved clarity in spoiler effect section](docs/audience_clarity_after.png)
 
-### A worked moment, for shape
+where now the wording is significantly improved, and the name of the effect is clearly stated too.
 
-Delete this section along with the rest of the boilerplate --- it's here to show
-the four jobs in one paragraph, not to be imitated in content.
+This paid off later when I asked the agent to address how IRV mitigates FPTP's flaws in the IRV section, and it independently summarised this in the conclusion too, honouring the cohesiveness rule without being explicitly told to.
 
-> The date formatter kept coming back with `toLocaleDateString()` and no locale
-> argument, so the same build rendered differently on my machine and in CI. I'd
-> already re-prompted it twice, which fixed the line but not the habit, so the
-> third time I put the rule in `CLAUDE.md` instead
-> ([`3f9ac21`](https://github.com/YOUR-ORG/YOUR-REPO/commit/3f9ac21)) and added
-> a spec test that fails on a bare `toLocaleDateString`. That's what told me it
-> had actually taken: the test went red against the old code and green against
-> the new, and the next two features it wrote passed it without prompting
-> ([`3f9ac21...b7e0d14`](https://github.com/YOUR-ORG/YOUR-REPO/compare/3f9ac21...b7e0d14)).
+### Solidifying the visual language
 
-## Before you ship
+Originally, the website had no personality, having quite a plain design.
 
-`pnpm check:evidence` verifies your citations resolve to real commits, that the
-current reflection entry is in `reflections/`, and that your `CLAUDE.md` is
-there --- before a marker ever opens the file. It checks that your map is
-traceable, not that it is good: the marker judges whether your small,
-deliberately chosen set of moments shows real judgement and reflection. A green
-check is not a substitute for that curation.
+![website before redesign](docs/visual_redesign_before.png)
 
-Images are deliberately not checked, because whether one renders is visible the
-moment you look. Open this file on GitHub and look at it before you ship.
+The obvious fix would have been to simply give a solidified visual language description to Claude and ask it to build right away.
+But this approach would only work for the current iteration, since there is no guarantee future changes would continue to adhere to this new design language.
+So, I gave concrete design ideas to the agent, but also asked it to write the design elements to `CLAUDE.md`, and furthermore, add checks where applicable, as follows. 
+
+> Let's now give the website a visual uplift. Write to CLAUDE.md the concrete styling we decide on, with checks where applicable too, before implementing the changes. I want a modern, professional, news-like design. Headlines should have a serif font and body should have sans, for editorial authority. Choose fonts with character and personality, rather than generic fonts. Colours should be non-partisan and neutral (avoid red/blue). If accent colours are needed, use sparingly to avoid confusion with the candidate colours. Have generous whitespace, with a narrower text column than the wider sticky visualisation to make the storytelling feel more premium. Whitespace between sections is important to let readers focus on one section at a time, and to soak in the details before moving onto the next sections. Ensure the layout grid, margins is consistent all throughout the website for cohesiveness. Feel free to add anything else that should be called out, and would fit with the design I've described so far.
+
+This would mean that future changes and additions would continue to consistently adhere to this visual language.
+
+After implementing the changes, the newly added checks passed, and I visually inspected the changes on both assessed viewports and ensured they met the descriptions I provided. There were minor issues after the redesign, including alignment inconsistencies and padding issues, which I resolved through further prompting.
+
+Following all prompting, the redesign looked as follows ([`72ac3a0`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-attwelveDev/commit/72ac3a0998182730427bbf1ae2ee6e4c8efffa50)).
+
+![website after redesign](docs/visual_redesign_after.png)
+
+### Emphasising the importance of animations on user experience
+
+Adding realistic and reliable animations was perhaps the most difficult part of this process.
+From early on I wanted to have the ballot paper from the ballot explainer section fly into the corresponding candidate stack in following section, to create a sense of harmony throughout the story.
+For the IRV visualisations, I wanted votes to visually transfer from eliminated candidates to the next preferred candidate to help visualise the voting method. 
+Through prompting, I encountered issues such as Claude creating a small ballot 'icon' that flies from explainer section instead of the real-size ballot paper flying in, and this icon would awkwardly remain visible on the candidate stack.
+I felt this lacked realism and a sense of cohesiveness, and furthermore felt cheap. 
+After further prompting to use a full-size card, the card was still not full-width, and would look unrealistic when scrolling back upwards.
+Recognising that there is no standard for 'realism' or 'cohesiveness', even if this were fixed, further animations may also prove difficult to have a consistent style.
+Hence, I prompted the agent to write in `CLAUDE.md` about the importance of animations, and set a standard for visual appeal and cohesiveness, and also write checks which should run until they are green. 
+
+> Currently the animations are not perfect. Before you try to continue building to fix it, can we perhaps add a line to CLAUDE.md to address this? Animations should be tested thoroughly before it is considered "green". Animations should try to look smooth and not janky. Animations are a key part of this design to make this design stand out. Animations not just help add visual appeal, but should help convey information, like a ballot paper flying from one section to another, indicating they are related to each other. What do you think?
+
+The agent subsequently added checks for the animations that I had described, which all failed at first, as expected.
+Although this prompt forces Claude to continually write tests for animations from then onwards, which indeed passed with every iteration, Claude still took further prompting to eventually achieve clean animations ([`37379b0...f6b7e1c`](https://github.com/comp4020-agentic-coding-studio/comp4020-ass1-attwelveDev/compare/37379b0...f6b7e1c)).
+On the upside, this means that by the end, the agent has developed an extensive suite of tests to ensure the animation works properly, and is able to hold up to future changes too.
+Further to the checks, I visually inspected the animations on both assessed viewports to ensure they met my expections.
