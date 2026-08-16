@@ -251,8 +251,13 @@ const irvWinner = spoilerCandidatesById.get("aster")!;
             Here's that same election again, but counted a different way.
             Instant-runoff voting uses every voter's full ranking: if no one
             has a majority of first preferences, the last-place candidate is
-            eliminated and their ballots move to each voter's next choice.
-            Step through the recount and watch who wins this time.
+            eliminated and their ballots move to each voter's next choice. In
+            a real election those ballots usually split across several
+            remaining candidates, weighted toward whichever is most similar
+            to the one just eliminated — here, every one of a candidate's
+            voters shares the same ranking, so their whole block moves
+            together instead. Step through the recount and watch who wins
+            this time.
           </p>
         </div>
         <div class="chapter-viz" id="recount-app">

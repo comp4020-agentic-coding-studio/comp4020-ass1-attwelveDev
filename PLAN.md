@@ -1684,6 +1684,58 @@ Checks:
   attribute, since a running `Element.animate()` doesn't mutate the latter
   in a real browser.
 
+## Copy + Fix: the recount's transfer simplification and the majority stopping rule were both invisible to the reader
+
+Two related clarity gaps, both reported directly by a reader: the recount
+section never admits that its ballot-transfer model is a simplification,
+and nothing on screen explains why a winner can be declared while other
+candidates are still shown un-eliminated — the reader saw three candidates
+left, one declared "Winner," and had to work out for themselves that the
+winner had crossed a majority.
+
+- **Copy**: extended `index.astro`'s "Recounting the same election under
+  IRV" paragraph with a sentence naming the simplification honestly: real
+  IRV elimination usually splits a candidate's ballots across several
+  remaining candidates, weighted toward whichever is most similar to the
+  one just eliminated, whereas here every one of a candidate's voters
+  shares one identical ranking, so their whole block moves together
+  instead. True of every scenario in the data model
+  (`scenario-spoiler.ts`, `freeplay-scenario.ts`'s `toScenario()`), not
+  just this section's example, so the sentence was written to generalise.
+- **Fix**: `tallyIrv` declares a winner the instant any candidate's count
+  exceeds half the vote still in play — correct, but that can happen after
+  eliminating just one low-polling candidate, leaving several others still
+  active and displayed with real vote counts. Added `winnerAnnouncement()`
+  to `format.ts`, naming the actual count/total ("Aster wins after the
+  recount, having crossed a majority of the vote (620 of 1000).") so the
+  reader sees *why* the recount stopped, not just that it did. Wired into
+  `irv-app.ts`'s winner banner, which both the scripted `#recount-app`
+  section and the free-play recount panel (`freeplay-app.ts`'s
+  `rebuildRecount()`) share — one fix, both places. (An earlier draft
+  appended "— the recount stops there, even before every other candidate
+  is eliminated," but that's inferable from the count/total already
+  stated, so it was cut to keep the sentence tight.)
+
+Checks:
+- `pnpm check` stays green — 197/197 tests, including a new
+  `winnerAnnouncement` case in `format.test.ts`, an updated exact-match
+  assertion plus a new four-candidate test in `irv-app.test.ts`
+  ("declares a winner as soon as they cross a majority, even while other
+  candidates remain un-eliminated"), and an updated assertion in
+  `freeplay-app.test.ts`.
+- **Manual browser pass** (`pnpm preview`, both marking viewports —
+  1920×1080 and 390×844): read the new recount-section sentence in place
+  and confirmed it renders cleanly at both widths (at mobile, correctly
+  scrolls beneath the sticky viz card like the rest of the paragraph).
+  Stepped the scripted recount through to its winner banner and confirmed
+  the new count/total text. In the free-play panel, added a fourth
+  candidate and adjusted vote shares (450/278/89/183) so eliminating the
+  lowest candidate (Cypress, whose next preference was Alder) pushed
+  Alder to 539/1000 — reproducing the reported confusion exactly: Alder
+  declared "Winner" while Beech and Dahlia remain on screen, un-eliminated,
+  with the banner reading "Alder wins after the recount, having crossed a
+  majority of the vote (539 of 1000)." Confirmed at both viewports.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice

@@ -227,7 +227,7 @@ describe("initIrvApp", () => {
       root.querySelector('[data-testid="round-status"]')!.textContent,
     ).toBe("Round 2: C is eliminated.");
     expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
-      "A wins after the recount.",
+      "A wins after the recount, having crossed a majority of the vote (65 of 100).",
     );
 
     const testids = [...root.querySelectorAll("[data-testid]")].map((el) =>
@@ -236,6 +236,52 @@ describe("initIrvApp", () => {
     expect(testids.indexOf("round-status")).toBeLessThan(
       testids.indexOf("winner"),
     );
+  });
+
+  it("declares a winner as soon as they cross a majority, even while other candidates remain un-eliminated", () => {
+    // a45/b30/c15/d10: d is eliminated first and all 10 of its ballots
+    // transfer to a, taking a to 55 of 100 -- a clear majority, so the
+    // recount stops there even though b and c are still standing (never
+    // eliminated, still showing their real vote counts).
+    const fourWayScenario: Scenario = {
+      candidates: candidates(["a", "b", "c", "d"]),
+      groups: [
+        { ranking: ["a", "b", "c", "d"], count: 45 },
+        { ranking: ["b", "a", "c", "d"], count: 30 },
+        { ranking: ["c", "a", "b", "d"], count: 15 },
+        { ranking: ["d", "a", "b", "c"], count: 10 },
+      ],
+    };
+    const root = setUp(false, fourWayScenario);
+
+    root
+      .querySelector<HTMLButtonElement>('button[data-action="next-round"]')!
+      .click();
+
+    expect(root.querySelector('[data-testid="winner"]')!.textContent).toBe(
+      "A wins after the recount, having crossed a majority of the vote (55 of 100).",
+    );
+    expect(root.querySelector('[data-count-for="b"]')!.textContent).toBe(
+      "30",
+    );
+    expect(root.querySelector('[data-count-for="c"]')!.textContent).toBe(
+      "15",
+    );
+    expect(root.querySelector('[data-count-for="d"]')!.textContent).toBe(
+      "eliminated",
+    );
+    expect(
+      root.querySelector('[data-candidate="a"]')!.classList.contains(
+        "is-winner",
+      ),
+    ).toBe(true);
+    for (const id of ["b", "c"]) {
+      expect(
+        root.querySelector(`[data-candidate="${id}"]`)!.classList.contains(
+          "is-winner",
+        ),
+      ).toBe(false);
+    }
   });
 
   it("restores is-leading after stepping back to round 1, clearing is-winner", () => {

@@ -2,6 +2,7 @@ import { JSDOM } from "jsdom";
 import { describe, expect, it, vi } from "vitest";
 import { initFreeplayApp } from "./freeplay-app";
 import { FREEPLAY_MAX_CANDIDATES, FREEPLAY_MIN_CANDIDATES } from "../lib/freeplay-palette";
+import { winnerAnnouncement } from "../lib/format";
 import { tallyIrv } from "../lib/tally-irv";
 import type { Scenario } from "../lib/types";
 
@@ -249,10 +250,18 @@ describe("initFreeplayApp", () => {
     // truth this recount should reach once fully stepped through.
     while (!nextButton.disabled) click(dom, nextButton);
 
-    const expectedWinner = tallyIrv(scenario(3)).winner;
+    const { rounds, winner: expectedWinner } = tallyIrv(scenario(3));
+    const finalCounts = rounds[rounds.length - 1].counts;
+    const total = Object.values(finalCounts).reduce((sum, n) => sum + n, 0);
     expect(
       recount.querySelector('[data-testid="winner"]')!.textContent,
-    ).toBe(`${expectedWinner.toUpperCase()} wins after the recount.`);
+    ).toBe(
+      winnerAnnouncement(
+        expectedWinner.toUpperCase(),
+        finalCounts[expectedWinner],
+        total,
+      ),
+    );
   });
 
   it("resets the recount panel back to round 0 after any edit made while in IRV mode", () => {

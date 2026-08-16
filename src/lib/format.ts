@@ -34,3 +34,15 @@ export function tieNote(tiedLabels: string[], onWhat: string): string {
       : `${tiedLabels.slice(0, -1).join(", ")} and ${tiedLabels[tiedLabels.length - 1]}`;
   return ` Tied with ${list} on ${onWhat} — ties are broken alphabetically by name.`;
 }
+
+// tallyIrv declares a winner the moment any candidate clears a majority of
+// the vote still in play, which can happen while other candidates are still
+// standing (not yet eliminated) -- naming the actual count here is what
+// tells a reader that's the rule working as intended, not a bug.
+export function winnerAnnouncement(
+  label: string,
+  count: number,
+  total: number,
+): string {
+  return `${label} wins after the recount, having crossed a majority of the vote (${count} of ${total}).`;
+}

@@ -1,4 +1,4 @@
-import { tieNote, tiedCandidateIds } from "../lib/format";
+import { tieNote, tiedCandidateIds, winnerAnnouncement } from "../lib/format";
 import { createIrvController } from "../lib/irv-controller";
 import { tallyFptp } from "../lib/tally-fptp";
 import type { Candidate, CandidateId, Scenario } from "../lib/types";
@@ -134,9 +134,10 @@ export function initIrvApp(root: ParentNode, scenario: Scenario): void {
 
     if (winnerEl) {
       const winnerCandidate = winner ? candidatesById.get(winner) : null;
-      winnerEl.textContent = winnerCandidate
-        ? `${winnerCandidate.label} wins after the recount.`
-        : "";
+      winnerEl.textContent =
+        winner && winnerCandidate
+          ? winnerAnnouncement(winnerCandidate.label, round.counts[winner], total)
+          : "";
     }
 
     if (nextButton) nextButton.disabled = controller.isFinal;
