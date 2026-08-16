@@ -24,7 +24,7 @@ function drawPath(path: SVGPathElement, delay: number): void {
   });
 }
 
-function drawBallot(ballot: HTMLElement): void {
+export function drawBallot(ballot: HTMLElement): void {
   const checkPath = ballot.querySelector<SVGPathElement>(
     ".ballot-paper-check-mark path",
   );
@@ -41,6 +41,23 @@ function drawBallot(ballot: HTMLElement): void {
   });
 }
 
+// Snaps a ballot's marks straight to their hidden (undrawn) starting state,
+// with no animation -- for ballots a caller intends to draw in later on its
+// own trigger (see strategic-story.ts) rather than on generic scroll-into-
+// view. Safe to call redundantly before drawBallot(), which sets the same
+// starting state itself right before animating from it.
+export function hideBallotMarks(ballot: HTMLElement): void {
+  const paths = ballot.querySelectorAll<SVGPathElement>(
+    ".ballot-paper-mark path",
+  );
+  for (const path of paths) {
+    if (typeof path.getTotalLength !== "function") continue;
+    const length = path.getTotalLength();
+    path.style.strokeDasharray = `${length}`;
+    path.style.strokeDashoffset = `${length}`;
+  }
+}
+
 // Animates each full ballot paper's tick/preference-number marks in with a
 // hand-drawn stroke the first time it scrolls into a centred view --
 // mirrors ballot-drift.ts's swarm observer (fire once on the first
@@ -48,7 +65,9 @@ function drawBallot(ballot: HTMLElement): void {
 // transition guard, since a ballot's marks only ever need to draw once,
 // never reverse. Skips animating entirely under prefers-reduced-motion or
 // without IntersectionObserver support, leaving CSS's fully-drawn default in
-// place rather than animating on load.
+// place rather than animating on load. Ballots marked data-marks-manual are
+// excluded -- they're drawn on a different trigger entirely, see
+// strategic-story.ts.
 export function initBallotMarks(root: ParentNode): void {
   const doc = root.ownerDocument ?? (root as Document);
   const view = doc.defaultView;
@@ -59,7 +78,9 @@ export function initBallotMarks(root: ParentNode): void {
     view.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (reducedMotion) return;
 
-  const ballots = root.querySelectorAll<HTMLElement>(".ballot-paper-full");
+  const ballots = root.querySelectorAll<HTMLElement>(
+    ".ballot-paper-full:not([data-marks-manual])",
+  );
   if (typeof view.IntersectionObserver !== "function") {
     for (const ballot of ballots) drawBallot(ballot);
     return;

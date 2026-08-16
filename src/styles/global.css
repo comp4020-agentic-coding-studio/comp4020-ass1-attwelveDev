@@ -465,12 +465,12 @@ main > section:not(.chapter) > p {
 }
 
 /*
- * Opts a single .chapter-prose (the spoiler section) out of the shared
- * "centre one paragraph" layout above and into a taller scroll-driven
- * sequence -- each .scroll-step gets its own generous scroll runway so the
- * reader spends real scroll distance on each beat, in sync with the sticky
- * viz beside/above it. Scoped to this modifier so every other .chapter-prose
- * keeps its single-paragraph centring untouched.
+ * Opts a .chapter-prose (the spoiler and strategic-voting sections) out of
+ * the shared "centre one paragraph" layout above and into a taller
+ * scroll-driven sequence -- each .scroll-step gets its own generous scroll
+ * runway so the reader spends real scroll distance on each beat, in sync
+ * with the sticky viz beside/above it. Scoped to this modifier so every
+ * other .chapter-prose keeps its single-paragraph centring untouched.
  */
 .chapter-prose-story {
   justify-content: flex-start;
@@ -526,6 +526,26 @@ main > section:not(.chapter) > p {
   display: flex;
   gap: 2rem;
   flex-wrap: wrap;
+}
+
+/*
+ * Same dimming language as .candidate-stack.is-dimmed: fade the
+ * non-spotlighted ballot out via opacity as the strategic-voting
+ * scrollytelling section spotlights its sincere/tactical pair one at a
+ * time, reversibly, in sync with the prose (see strategic-story.ts).
+ */
+.ballot-comparison [data-ballot] {
+  transition: opacity 0.3s ease;
+}
+
+.ballot-comparison [data-ballot].is-dimmed {
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ballot-comparison [data-ballot] {
+    transition: none;
+  }
 }
 
 .recount-controls {

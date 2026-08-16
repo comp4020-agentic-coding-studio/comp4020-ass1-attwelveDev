@@ -7,8 +7,16 @@ interface Props {
   variant: "full" | "mini";
   mode?: "fptp" | "irv";
   hero?: boolean;
+  manualMarks?: boolean;
 }
-const { candidates, ranking, variant, mode = "irv", hero = false } = Astro.props;
+const {
+  candidates,
+  ranking,
+  variant,
+  mode = "irv",
+  hero = false,
+  manualMarks = false,
+} = Astro.props;
 
 const candidatesById = new Map(candidates.map((c) => [c.id, c]));
 const first = candidatesById.get(ranking[0]);
@@ -32,7 +40,11 @@ const NUMERAL_PATHS: Record<number, string> = {
 
 {
   variant === "full" ? (
-    <div class="ballot-paper ballot-paper-full" data-hero-ballot={hero ? ranking[0] : undefined}>
+    <div
+      class="ballot-paper ballot-paper-full"
+      data-hero-ballot={hero ? ranking[0] : undefined}
+      data-marks-manual={manualMarks ? "" : undefined}
+    >
       <p class="ballot-paper-heading">Ballot paper</p>
       {mode === "irv" ? (
         <>

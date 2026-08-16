@@ -1625,6 +1625,65 @@ Checks:
   transitions compute to `0s` duration. Read all four beats cold, start to
   finish, per CLAUDE.md's "assume nothing" rule.
 
+## Feature: scrollytelling reveal for the strategic-voting section
+
+The "why voters vote tactically" section was one dense paragraph next to a
+static sincere/tactical ballot comparison that never reacted to the prose.
+The user asked for the same split-and-fade design as the spoiler-effect
+section, split more evenly across three beats, with the ballot pair dimming
+in sync — plus an extra: each ballot's tick mark should draw in by hand the
+first time its beat highlights it, once only, never undone by scrolling back.
+
+- Copy split into three beats in `index.astro`: a plain, already-ink intro
+  stating the general strategic-voting flaw (both ballots normal), then two
+  scroll-revealed steps — the sincere Birch vote (`data-spotlight="sincere"`,
+  dims the tactical ballot) and the tactical Aster vote
+  (`data-spotlight="tactical"`, dims the sincere ballot instead).
+- New `src/scripts/strategic-story.ts` (`initStrategicStory`), wired in
+  `bootstrap.ts`: reuses `spoiler-story.ts`'s reversible centred-band
+  `IntersectionObserver` idiom exactly (`rootMargin: "-35% 0px -35% 0px"`,
+  visible state a pure function of which step currently intersects), plus a
+  one-shot layer on top — the first time a ballot is spotlighted, its tick
+  mark draws in via `ballot-marks.ts`'s `drawBallot` (now exported) rather
+  than sitting there already ticked. A `Set` of already-drawn ballot ids
+  makes the draw fire-once even though the dimming itself keeps reversing on
+  every subsequent visit to that step.
+- `ballot-marks.ts` gained `hideBallotMarks` (snaps a ballot's marks to their
+  hidden starting state with no animation, so a manually-triggered ballot
+  doesn't start already ticked) and its generic `initBallotMarks` sweep now
+  excludes `.ballot-paper-full:not([data-marks-manual])` so these two
+  manually-triggered ballots aren't double-drawn by the generic scroll-into-
+  view pass. `BallotPaper.astro` gained a `manualMarks` prop that renders
+  `data-marks-manual` to opt a ballot out of that sweep.
+- New `.ballot-comparison [data-ballot].is-dimmed` state in `global.css`
+  (opacity 0.35 only — ballot papers have no swatch/fill needing
+  greyscale-muting the way `.candidate-stack.is-dimmed` does). Respects
+  `prefers-reduced-motion: reduce`. `.chapter-prose-story`'s doc comment
+  updated to note it's now shared by two sections.
+- Out of scope: no change to the spoiler section's own dimming, no change
+  to `.candidate-stack.is-dimmed`, no new easing beyond the existing
+  `drawPath` stroke animation and CSS opacity transitions.
+
+Checks:
+- `pnpm check` (typecheck, build, lint, full test suite) stays green — 195
+  tests passing, including 9 new cases in `strategic-story.test.ts` (reveal +
+  spotlight dims the other ballot, switching which ballot is dimmed as steps
+  hand off, reversal on scrolling away, ticks hidden up front, a ballot's
+  tick drawing in on its first spotlight, no redraw on a later re-spotlight
+  of the same ballot even as dimming keeps reversing, no-`IntersectionObserver`
+  degradation drawing both marks immediately, reduced-motion skipping both
+  the hide and the draw, and a root with no `.scroll-step`s).
+- **Manual browser pass** (`pnpm preview`, both marking viewports): at
+  1920×1080 and 390×844, confirmed the intro state (both ballots normal,
+  both ticks hidden), step one (sincere ballot normal + tick drawn, tactical
+  dimmed), step two (tactical ballot normal + tick drawn, sincere dimmed but
+  its tick stays drawn — one-shot confirmed), scrolling back up (dimming
+  reverses correctly while both ticks remain drawn), and scrolling past
+  (all dimming clears). Verified the actual rendered draw state via
+  `getComputedStyle(path).strokeDashoffset` rather than the inline `style`
+  attribute, since a running `Element.animate()` doesn't mutate the latter
+  in a real browser.
+
 ## Data model
 
 - Individual voters with full preference orderings (not just first-choice

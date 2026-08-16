@@ -8,6 +8,7 @@ import { initFreeplayApp } from "./freeplay-app";
 import { initIrvApp } from "./irv-app";
 import { initIrvDrift } from "./irv-drift";
 import { initSpoilerStory } from "./spoiler-story";
+import { initStrategicStory } from "./strategic-story";
 
 const fptpIntroRoot = document.querySelector("#fptp-ballot-intro");
 const exploreRoot = document.querySelector("#explore-app");
@@ -25,6 +26,12 @@ if (spoilerRoot) {
   // chapters' "how the ballot works" heroes.
   initBallotDrift(null, spoilerRoot, scenarioSpoiler);
   if (spoilerProseRoot) initSpoilerStory(spoilerProseRoot, spoilerRoot);
+}
+
+const strategicAppRoot = document.querySelector("#strategic-app");
+const strategicProseRoot = document.querySelector("#strategic-prose");
+if (strategicAppRoot && strategicProseRoot) {
+  initStrategicStory(strategicProseRoot, strategicAppRoot);
 }
 
 const irvIntroRoot = document.querySelector("#irv-ballot-intro");

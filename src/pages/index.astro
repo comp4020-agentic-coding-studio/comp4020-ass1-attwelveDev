@@ -163,37 +163,44 @@ const irvWinner = spoilerCandidatesById.get("aster")!;
       </section>
 
       <section class="chapter" aria-labelledby="strategic-heading">
-        <div class="chapter-prose">
-          <p>
+        <div class="chapter-prose chapter-prose-story" id="strategic-prose">
+          <p class="scroll-intro">
             Under first-past-the-post, a vote for a candidate who can't win
             doesn't just fail to help them — it can help elect the candidate
             you like least, by leaving a rival who could actually beat them
-            short of the votes needed to do it. Take one Birch supporter
-            from the scenario above: Birch is the weaker of the two similar
-            candidates, so backing them sincerely leaves Cedar's plurality
-            untouched. Backing Aster instead — their genuine second choice —
-            actually changes the outcome.
+            short of the votes needed to do it.
+          </p>
+          <p class="scroll-step" data-spotlight="sincere">
+            Take one Birch supporter from the scenario above: Birch is the
+            weaker of the two similar candidates, so backing them sincerely
+            leaves Cedar's plurality untouched.
+          </p>
+          <p class="scroll-step" data-spotlight="tactical">
+            Backing Aster instead — their genuine second choice — actually
+            changes the outcome.
           </p>
         </div>
-        <div class="chapter-viz">
+        <div class="chapter-viz" id="strategic-app">
           <h2 id="strategic-heading">Why voters vote tactically</h2>
           <div class="ballot-comparison">
-            <div>
+            <div data-ballot="sincere">
               <h3>Sincere vote</h3>
               <BallotPaper
                 candidates={scenarioSpoiler.candidates}
                 ranking={strategicBallot.sincereRanking}
                 variant="full"
                 mode="fptp"
+                manualMarks
               />
             </div>
-            <div>
+            <div data-ballot="tactical">
               <h3>Tactical vote</h3>
               <BallotPaper
                 candidates={scenarioSpoiler.candidates}
                 ranking={strategicBallot.tacticalRanking}
                 variant="full"
                 mode="fptp"
+                manualMarks
               />
             </div>
           </div>
