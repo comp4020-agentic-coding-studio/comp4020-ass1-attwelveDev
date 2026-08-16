@@ -823,22 +823,44 @@ main > section:not(.chapter) > p {
   outline-offset: 2px;
 }
 
-/*
- * The thumb is invisible by default (the whole coloured fill is the drag
- * target, not a small handle) -- but a keyboard user tabbing onto a stack
- * has no other cue that it's draggable at all, so give it one only on
- * keyboard focus. A disabled slider (eg. the IRV recount section, where
- * candidates aren't adjustable) can't receive focus, so this never shows
- * there without needing to scope it out explicitly.
- */
-.candidate-stack-slider:focus-visible::-webkit-slider-thumb {
-  background: var(--colour-accent);
-  border-radius: 2px;
+.candidate-stack-slider:disabled {
+  cursor: default;
 }
 
-.candidate-stack-slider:focus-visible::-moz-range-thumb {
-  background: var(--colour-accent);
+/*
+ * A grabber cue at the fill boundary, shown on hover (a cursor user pointing
+ * at a stack sees it's draggable before they commit to a click) and on
+ * keyboard focus (the equivalent cue for a keyboard user tabbing onto it).
+ * This is a positioned marker on .candidate-stack-fill rather than styling
+ * the slider's own ::-webkit-slider-thumb/::-moz-range-thumb directly:
+ * Chromium doesn't repaint that thumb pseudo-element when only a dynamic
+ * pseudo-class (:hover/:focus-visible) of the host changes on a range input
+ * reoriented with writing-mode: vertical-lr -- confirmed with a minimal
+ * reproduction outside this app, so it's a browser limitation with this
+ * slider's vertical trick, not a mistake in a specificity/selector here.
+ * `:hover` still matches a disabled input in CSS -- the disabled attribute
+ * blocks interaction, not pseudo-class matching -- so `:not(:disabled)` is
+ * required to keep the IRV recount section's disabled sliders grabber-less;
+ * :focus-visible needs no such guard since a disabled input can never
+ * receive focus.
+ */
+.candidate-stack-fill::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  left: 0;
+  top: -0.25rem;
+  height: 0.5rem;
+  background: transparent;
   border-radius: 2px;
+  pointer-events: none;
+}
+
+.candidate-stack-bar:has(.candidate-stack-slider:focus-visible)
+  .candidate-stack-fill::after,
+.candidate-stack-bar:has(.candidate-stack-slider:hover:not(:disabled))
+  .candidate-stack-fill::after {
+  background: var(--colour-accent);
 }
 
 .candidate-stack button[data-action="remove-candidate"] {
